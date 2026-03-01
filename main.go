@@ -33,13 +33,13 @@ type config struct {
 	boxRows    int
 }
 
-type imageListFlag []string
+type stringListFlag []string
 
-func (f *imageListFlag) String() string {
+func (f *stringListFlag) String() string {
 	return strings.Join(*f, ",")
 }
 
-func (f *imageListFlag) Set(value string) error {
+func (f *stringListFlag) Set(value string) error {
 	for _, p := range strings.Split(value, ",") {
 		trimmed := strings.TrimSpace(p)
 		if trimmed != "" {
@@ -49,15 +49,67 @@ func (f *imageListFlag) Set(value string) error {
 	return nil
 }
 
+var imageExtensions = map[string]bool{
+	".png": true, ".jpg": true, ".jpeg": true, ".gif": true,
+	".bmp": true, ".webp": true, ".tiff": true, ".tif": true,
+	".svg": true, ".ico": true, ".avif": true,
+}
+
+func isImageFile(name string) bool {
+	return imageExtensions[strings.ToLower(filepath.Ext(name))]
+}
+
+func collectImagesFromDir(dir string) ([]string, error) {
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, fmt.Errorf("resolve dir %q: %w", dir, err)
+	}
+	info, err := os.Stat(absDir)
+	if err != nil {
+		return nil, fmt.Errorf("invalid dir %q: %w", absDir, err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("%q is not a directory", absDir)
+	}
+
+	entries, err := os.ReadDir(absDir)
+	if err != nil {
+		return nil, fmt.Errorf("read dir %q: %w", absDir, err)
+	}
+
+	var paths []string
+	for _, e := range entries {
+		if e.IsDir() || !isImageFile(e.Name()) {
+			continue
+		}
+		paths = append(paths, filepath.Join(absDir, e.Name()))
+	}
+	return paths, nil
+}
+
 func parseConfig() (config, error) {
-	var imagePaths imageListFlag
+	var imagePaths stringListFlag
+	var imageDirs stringListFlag
 	flag.Var(&imagePaths, "image", "image path (repeat flag or pass comma-separated list)")
+	flag.Var(&imageDirs, "image-dir", "directory of images (repeat flag or pass comma-separated list)")
 	boxCols := flag.Int("box-cols", defaultBoxCols, "fixed image box width in terminal cells")
 	boxRows := flag.Int("box-rows", defaultBoxRows, "fixed image box height in terminal cells")
 	flag.Parse()
 
+	// Collect images from --image-dir flags
+	for _, dir := range imageDirs {
+		dirImages, err := collectImagesFromDir(dir)
+		if err != nil {
+			return config{}, err
+		}
+		if len(dirImages) == 0 {
+			return config{}, fmt.Errorf("no image files found in %q", dir)
+		}
+		imagePaths = append(imagePaths, dirImages...)
+	}
+
 	if len(imagePaths) == 0 {
-		return config{}, errors.New("missing required flag --image")
+		return config{}, errors.New("missing required flag --image or --image-dir")
 	}
 	if *boxCols < minimumBoxSize || *boxRows < minimumBoxSize {
 		return config{}, fmt.Errorf("invalid box size: --box-cols and --box-rows must be >= %d", minimumBoxSize)
