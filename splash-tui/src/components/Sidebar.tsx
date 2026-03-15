@@ -6,6 +6,7 @@ const menuOptions = [
   { name: "Colors", description: "Color palette demo", value: "colors" },
   { name: "Images", description: "Image viewer demo", value: "images" },
   { name: "Showcase", description: "Reusable image demo", value: "showcase" },
+  { name: "Chart", description: "Native sine plot demo", value: "chart" },
   { name: "About", description: "About this app", value: "about" },
 ]
 

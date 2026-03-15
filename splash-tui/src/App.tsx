@@ -5,7 +5,7 @@ import { Sidebar } from "./components/Sidebar"
 import { Dashboard } from "./components/Dashboard"
 import { StatusBar } from "./components/StatusBar"
 
-export type Panel = "welcome" | "system" | "colors" | "images" | "showcase" | "about"
+export type Panel = "welcome" | "system" | "colors" | "images" | "showcase" | "chart" | "about"
 
 export function App() {
   const renderer = useRenderer()

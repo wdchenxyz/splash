@@ -4,6 +4,7 @@ import { SystemPanel } from "./panels/SystemPanel"
 import { ColorsPanel } from "./panels/ColorsPanel"
 import { ImagePanel } from "./panels/ImagePanel"
 import { ShowcasePanel } from "./panels/ShowcasePanel"
+import { ChartPanel } from "./panels/ChartPanel"
 import { AboutPanel } from "./panels/AboutPanel"
 
 interface DashboardProps {
@@ -25,6 +26,7 @@ export function Dashboard({ activePanel }: DashboardProps) {
       {activePanel === "colors" && <ColorsPanel />}
       {activePanel === "images" && <ImagePanel />}
       {activePanel === "showcase" && <ShowcasePanel />}
+      {activePanel === "chart" && <ChartPanel />}
       {activePanel === "about" && <AboutPanel />}
     </box>
   )
