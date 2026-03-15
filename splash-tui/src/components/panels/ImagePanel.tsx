@@ -15,23 +15,55 @@ import {
   setKittyOutput,
   type KittyVirtualImage,
 } from "../../lib/kitty-graphics"
+import { existsSync, readdirSync } from "fs"
 import path from "path"
 
 const IMAGE_DIR = path.resolve(import.meta.dir, "../../../../img_dir")
-
-const IMAGE_FILES = [
-  "image.png",
-  "image2.png",
-  "image-3.png",
-  "image-4.png",
-  "image-5.png",
-  "image-6.png",
-]
+const IMAGE_FILES = existsSync(IMAGE_DIR)
+  ? readdirSync(IMAGE_DIR)
+      .filter((name) => /\.(png|jpg|jpeg|webp)$/i.test(name))
+      .sort((a, b) => a.localeCompare(b))
+  : []
 
 type RenderMode = "color" | "grayscale"
 
 const FB_ID = "image-viewer-fb"
 const KITTY_TEXT_ID = "image-viewer-kitty-text"
+const IMAGE_LEFT = 31
+const IMAGE_TOP = 10
+
+function computeKittyPlacement(
+  image: ImageData,
+  termW: number,
+  termH: number,
+  resolution: { width: number; height: number } | null,
+) {
+  const maxCols = Math.max(10, termW - IMAGE_LEFT - 2)
+  const maxRows = Math.max(6, termH - IMAGE_TOP - 2)
+  const cellWidth = resolution?.width ? resolution.width / termW : 8
+  const cellHeight = resolution?.height ? resolution.height / termH : 16
+
+  const scale = Math.min(
+    (maxCols * cellWidth) / image.width,
+    (maxRows * cellHeight) / image.height,
+  )
+
+  const cols = Math.max(
+    1,
+    Math.min(maxCols, Math.round((image.width * scale) / cellWidth)),
+  )
+  const rows = Math.max(
+    1,
+    Math.min(maxRows, Math.round((image.height * scale) / cellHeight)),
+  )
+
+  return {
+    left: IMAGE_LEFT + Math.max(0, Math.floor((maxCols - cols) / 2)),
+    top: IMAGE_TOP,
+    cols,
+    rows,
+  }
+}
 
 export function ImagePanel() {
   const renderer = useRenderer()
@@ -46,12 +78,16 @@ export function ImagePanel() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [imageInfo, setImageInfo] = useState<string>("")
+  const [backendNote, setBackendNote] = useState<string | null>(null)
   const imageCache = useRef<Map<string, ImageData>>(new Map())
   const fbRef = useRef<FrameBufferRenderable | null>(null)
   const kittyTextRef = useRef<TextRenderable | null>(null)
   const kittyImageRef = useRef<KittyVirtualImage | null>(null)
 
   useKeyboard((key) => {
+    if (IMAGE_FILES.length === 0) {
+      return
+    }
     if (key.name === "right" || key.name === "l") {
       setImageIndex((i) => (i + 1) % IMAGE_FILES.length)
     }
@@ -65,6 +101,7 @@ export function ImagePanel() {
       setScaleMode((s) => (s === "fill" ? "fit" : "fill"))
     }
     if (key.name === "b" && kittySupport.current.supported) {
+      setBackendNote(null)
       setBackend((value) => (value === "kitty" ? "cell" : "kitty"))
     }
   })
@@ -139,7 +176,14 @@ export function ImagePanel() {
   // Load and render current image
   useEffect(() => {
     const fileName = IMAGE_FILES[imageIndex]
-    if (!fileName) return
+    if (!fileName) {
+      removeKittyImage()
+      removeFramebuffer()
+      setLoading(false)
+      setError(null)
+      setImageInfo(`No images found in ${path.basename(IMAGE_DIR)}/`)
+      return
+    }
     let cancelled = false
 
     async function load() {
@@ -157,13 +201,10 @@ export function ImagePanel() {
         if (backend === "kitty") {
           removeFramebuffer()
 
-          const left = 31
-          const top = 10
-          const cols = Math.max(10, termW - left - 2)
-          const rows = Math.max(6, termH - top - 2)
+          const layout = computeKittyPlacement(image, termW, termH, renderer.resolution)
 
           removeKittyImage()
-          const virtualImage = createVirtualImage(filePath, cols, rows)
+          const virtualImage = createVirtualImage(filePath, layout.cols, layout.rows)
           kittyImageRef.current = virtualImage
 
           if (!kittyTextRef.current) {
@@ -171,10 +212,10 @@ export function ImagePanel() {
               id: KITTY_TEXT_ID,
               content: virtualImage.placeholderText,
               position: "absolute",
-              left,
-              top,
-              width: cols,
-              height: rows,
+              left: layout.left,
+              top: layout.top,
+              width: layout.cols,
+              height: layout.rows,
               fg: virtualImage.color,
               zIndex: 49,
             })
@@ -183,21 +224,22 @@ export function ImagePanel() {
           } else {
             kittyTextRef.current.content = virtualImage.placeholderText
             kittyTextRef.current.fg = virtualImage.color
-            kittyTextRef.current.x = left
-            kittyTextRef.current.y = top
-            kittyTextRef.current.width = cols
-            kittyTextRef.current.height = rows
+            kittyTextRef.current.x = layout.left
+            kittyTextRef.current.y = layout.top
+            kittyTextRef.current.width = layout.cols
+            kittyTextRef.current.height = layout.rows
           }
 
+          setBackendNote(null)
           setImageInfo(
-            `${image.name} (${image.width}x${image.height}) [kitty placeholders ${cols}x${rows}]`,
+            `${image.name} (${image.width}x${image.height}) [kitty ${layout.cols}x${layout.rows}]  h/l cycle  b cell`,
           )
           renderer.requestRender()
         } else {
           removeKittyImage()
 
-          const fbX = 31
-          const fbY = 10
+          const fbX = IMAGE_LEFT
+          const fbY = IMAGE_TOP
           const fbW = Math.max(10, termW - fbX - 2)
           const fbH = Math.max(5, termH - fbY - 2)
 
@@ -210,7 +252,7 @@ export function ImagePanel() {
               buf, image, 0, 0, buf.width, buf.height, scaleMode,
             )
             setImageInfo(
-              `${image.name} (${image.width}x${image.height}) -> ${renderW}x${renderH * 2}px [${scaleMode}] [color] [cell]`,
+              `${image.name} (${image.width}x${image.height}) [cell ${renderW}x${renderH * 2}] [${scaleMode}] [color]  h/l cycle  m gray  f mode${kittySupport.current.supported ? "  b kitty" : ""}`,
             )
           } else {
             renderGrayscaleToBuffer(
@@ -218,7 +260,7 @@ export function ImagePanel() {
               RGBA.fromHex("#c0caf5"), RGBA.fromHex("#1a1b26"),
             )
             setImageInfo(
-              `${image.name} (${image.width}x${image.height}) [${scaleMode}] [grayscale] [cell]`,
+              `${image.name} (${image.width}x${image.height}) [cell] [${scaleMode}] [grayscale]  h/l cycle  m color  f mode${kittySupport.current.supported ? "  b kitty" : ""}`,
             )
           }
           renderer.requestRender()
@@ -227,7 +269,14 @@ export function ImagePanel() {
         setLoading(false)
       } catch (e) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : String(e))
+          const message = e instanceof Error ? e.message : String(e)
+          if (backend === "kitty") {
+            removeKittyImage()
+            setBackendNote(`kitty failed: ${message}`)
+            setBackend("cell")
+            return
+          }
+          setError(message)
           setLoading(false)
         }
       }
@@ -267,31 +316,15 @@ export function ImagePanel() {
         <text><span fg="#9ece6a">{imageInfo}</span></text>
       )}
 
-      <text>
-        <span fg="#565f89"><strong>h/l</strong></span>
-        <span fg="#414868"> prev/next </span>
-        {backend === "cell" && (
-          <>
-            <span fg="#565f89"><strong>m</strong></span>
-            <span fg="#414868"> color/gray </span>
-            <span fg="#565f89"><strong>f</strong></span>
-            <span fg="#414868"> {scaleMode === "fill" ? "fill->fit" : "fit->fill"} </span>
-          </>
-        )}
-        {kittySupport.current.supported && (
-          <>
-            <span fg="#565f89"><strong>b</strong></span>
-            <span fg="#414868"> {backend === "kitty" ? "kitty->cell" : "cell->kitty"} </span>
-          </>
-        )}
-        <span fg="#7aa2f7">[{imageIndex + 1}/{IMAGE_FILES.length}]</span>
-      </text>
-
-      {backend === "kitty" && (
+      {backendNote && (
         <text>
-          <span fg="#565f89">
-            {kittySupport.current.terminal} via {kittySupport.current.transport} - {kittySupport.current.reason}
-          </span>
+          <span fg="#e0af68">{backendNote}</span>
+        </text>
+      )}
+
+      {!loading && !error && (
+        <text>
+          <span fg="#565f89">[{imageIndex + 1}/{IMAGE_FILES.length}]</span>
         </text>
       )}
     </box>
