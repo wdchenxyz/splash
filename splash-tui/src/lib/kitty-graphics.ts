@@ -4,7 +4,8 @@ const KITTY_PLACEHOLDER = String.fromCodePoint(0x10eeee)
 const MAX_24BIT_IMAGE_ID = 0xfffffe
 
 let nextImageId = 0x1000
-let outputWriter: ((data: string) => void) | null = null
+
+export type KittyOutputWriter = (data: string) => void
 
 export interface KittySupport {
   supported: boolean
@@ -92,8 +93,7 @@ export function detectKittySupport(): KittySupport {
   }
 }
 
-function writeTerminalSequence(sequence: string): void {
-  const write = outputWriter ?? ((data: string) => process.stdout.write(data))
+function writeTerminalSequence(write: KittyOutputWriter, sequence: string): void {
   if (process.env.TMUX) {
     const escaped = sequence.replace(/\x1b/g, "\x1b\x1b")
     write(`\x1bPtmux;${escaped}\x1b\\`)
@@ -102,16 +102,26 @@ function writeTerminalSequence(sequence: string): void {
   write(sequence)
 }
 
-function writeGraphicsCommand(control: string, payload = ""): void {
+function writeGraphicsCommand(write: KittyOutputWriter, control: string, payload = ""): void {
   if (payload.length > 0) {
-    writeTerminalSequence(`\x1b_G${control};${payload}\x1b\\`)
+    writeTerminalSequence(write, `\x1b_G${control};${payload}\x1b\\`)
     return
   }
-  writeTerminalSequence(`\x1b_G${control}\x1b\\`)
+  writeTerminalSequence(write, `\x1b_G${control}\x1b\\`)
 }
 
-export function setKittyOutput(writer: ((data: string) => void) | null): void {
-  outputWriter = writer
+export function createRendererKittyWriter(renderer: {
+  writeOut?: (chunk: string) => boolean
+}): KittyOutputWriter {
+  const writeOut = renderer.writeOut?.bind(renderer)
+  if (writeOut) {
+    return (data: string) => {
+      writeOut(data)
+    }
+  }
+  return (data: string) => {
+    process.stdout.write(data)
+  }
 }
 
 function imageIdToColor(id: number): string {
@@ -128,23 +138,32 @@ function allocImageId(): number {
   return id
 }
 
-export function transmitImageFile(filePath: string, imageId?: number): number {
+export function transmitImageFile(
+  write: KittyOutputWriter,
+  filePath: string,
+  imageId?: number,
+): number {
   const id = imageId ?? allocImageId()
   const payload = Buffer.from(filePath).toString("base64")
-  writeGraphicsCommand(`a=t,f=100,t=f,i=${id},q=2`, payload)
+  writeGraphicsCommand(write, `a=t,f=100,t=f,i=${id},q=2`, payload)
   return id
 }
 
-export function createVirtualPlacement(id: number, cols: number, rows: number): void {
-  writeGraphicsCommand(`a=p,U=1,i=${id},c=${cols},r=${rows},C=1,q=2`)
+export function createVirtualPlacement(
+  write: KittyOutputWriter,
+  id: number,
+  cols: number,
+  rows: number,
+): void {
+  writeGraphicsCommand(write, `a=p,U=1,i=${id},c=${cols},r=${rows},C=1,q=2`)
 }
 
-export function deleteImage(id: number): void {
-  writeGraphicsCommand(`a=d,d=I,i=${id},q=2`)
+export function deleteImage(write: KittyOutputWriter, id: number): void {
+  writeGraphicsCommand(write, `a=d,d=I,i=${id},q=2`)
 }
 
-export function deleteAllImages(): void {
-  writeGraphicsCommand("a=d,d=A,q=2")
+export function deleteAllImages(write: KittyOutputWriter): void {
+  writeGraphicsCommand(write, "a=d,d=A,q=2")
 }
 
 function diacriticFor(index: number): string {
@@ -179,9 +198,14 @@ export function buildPlaceholderText(cols: number, rows: number): string {
   return lines.join("\n")
 }
 
-export function createVirtualImage(filePath: string, cols: number, rows: number): KittyVirtualImage {
-  const id = transmitImageFile(filePath)
-  createVirtualPlacement(id, cols, rows)
+export function createVirtualImage(
+  write: KittyOutputWriter,
+  filePath: string,
+  cols: number,
+  rows: number,
+): KittyVirtualImage {
+  const id = transmitImageFile(write, filePath)
+  createVirtualPlacement(write, id, cols, rows)
   return {
     id,
     cols,
