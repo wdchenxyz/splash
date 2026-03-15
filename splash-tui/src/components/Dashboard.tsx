@@ -3,6 +3,7 @@ import { WelcomePanel } from "./panels/WelcomePanel"
 import { SystemPanel } from "./panels/SystemPanel"
 import { ColorsPanel } from "./panels/ColorsPanel"
 import { ImagePanel } from "./panels/ImagePanel"
+import { ShowcasePanel } from "./panels/ShowcasePanel"
 import { AboutPanel } from "./panels/AboutPanel"
 
 interface DashboardProps {
@@ -23,6 +24,7 @@ export function Dashboard({ activePanel }: DashboardProps) {
       {activePanel === "system" && <SystemPanel />}
       {activePanel === "colors" && <ColorsPanel />}
       {activePanel === "images" && <ImagePanel />}
+      {activePanel === "showcase" && <ShowcasePanel />}
       {activePanel === "about" && <AboutPanel />}
     </box>
   )

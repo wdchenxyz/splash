@@ -9,6 +9,7 @@
 
 ### Main Component
 - `splash-tui/src/components/TerminalImage.tsx`
+- `splash-tui/src/lib/demo-images.ts` provides shared sample-image discovery for demo panels.
 
 ### What It Owns
 - backend selection (`auto`, `kitty`, `cell`)
@@ -29,11 +30,27 @@
 - Imperative rendering into the OpenTUI renderer tree
 - state updates that consumers can use to build status text or controls
 
+### Example Usage
+```tsx
+<TerminalImage
+  id="hero"
+  src={filePath}
+  area={{ left: 31, top: 12, cols: 60, rows: 24 }}
+  backend="auto"
+  mode="color"
+  scaleMode="fit"
+  onStateChange={(state) => {
+    // use state.backend / state.note / state.placement for UI
+  }}
+/>
+```
+
 ## Main Path: Kitty Placeholders
 
 ### Files
 - `splash-tui/src/components/TerminalImage.tsx`
 - `splash-tui/src/components/panels/ImagePanel.tsx`
+- `splash-tui/src/components/panels/ShowcasePanel.tsx`
 - `splash-tui/src/lib/kitty-graphics.ts`
 - `splash-tui/src/lib/kitty-diacritics.ts`
 
@@ -82,6 +99,13 @@ OpenTUI ImagePanel
 
 ### Files
 - `splash-tui/src/lib/image-renderer.ts`
+
+## Demo Consumers
+- `ImagePanel` uses a single `TerminalImage` instance as a high-fidelity viewer.
+- `ShowcasePanel` reuses `TerminalImage` twice at once:
+  - a featured image with `backend="auto"`
+  - a smaller grayscale preview with `backend="cell"`
+- This proves the module is reusable across multiple panels and layouts without duplicating renderer lifecycle logic.
 
 ### Workflow
 1. If Kitty is unavailable or throws, `TerminalImage` falls back to the `cell` backend.

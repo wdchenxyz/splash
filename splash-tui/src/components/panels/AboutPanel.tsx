@@ -62,7 +62,11 @@ export function AboutPanel() {
         </text>
         <text>
           <span fg="#9ece6a"> * </span>
-          <span fg="#c0caf5">Image rendering via FrameBuffer + half-block chars</span>
+          <span fg="#c0caf5">Reusable TerminalImage with Kitty + cell backends</span>
+        </text>
+        <text>
+          <span fg="#9ece6a"> * </span>
+          <span fg="#c0caf5">Multiple image layouts via the Showcase panel</span>
         </text>
       </box>
 

@@ -1,20 +1,18 @@
 import { useCallback, useMemo, useState } from "react"
 import { useKeyboard, useTerminalDimensions } from "@opentui/react"
-import { existsSync, readdirSync } from "fs"
-import path from "path"
 import {
   TerminalImage,
   type TerminalImageBackend,
   type TerminalImageState,
 } from "../TerminalImage"
 import type { ScaleMode } from "../../lib/image-renderer"
+import {
+  DEMO_IMAGE_DIR_NAME,
+  DEMO_IMAGE_FILES,
+  getDemoImagePath,
+} from "../../lib/demo-images"
 
-const IMAGE_DIR = path.resolve(import.meta.dir, "../../../../img_dir")
-const IMAGE_FILES = existsSync(IMAGE_DIR)
-  ? readdirSync(IMAGE_DIR)
-      .filter((name) => /\.(png|jpg|jpeg|webp)$/i.test(name))
-      .sort((a, b) => a.localeCompare(b))
-  : []
+const IMAGE_FILES = DEMO_IMAGE_FILES
 
 const IMAGE_LEFT = 31
 const IMAGE_TOP = 10
@@ -53,7 +51,7 @@ export function ImagePanel() {
 
   const currentPath = useMemo(() => {
     const fileName = IMAGE_FILES[imageIndex]
-    return fileName ? path.join(IMAGE_DIR, fileName) : null
+    return fileName ? getDemoImagePath(fileName) : null
   }, [imageIndex])
 
   const imageArea = useMemo(
@@ -126,7 +124,7 @@ export function ImagePanel() {
 
       {IMAGE_FILES.length === 0 ? (
         <text>
-          <span fg="#e0af68">No images found in `img_dir/`.</span>
+          <span fg="#e0af68">No images found in `{DEMO_IMAGE_DIR_NAME}/`.</span>
         </text>
       ) : imageState?.loading ? (
         <text>

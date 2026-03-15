@@ -5,6 +5,7 @@ const menuOptions = [
   { name: "System", description: "System information", value: "system" },
   { name: "Colors", description: "Color palette demo", value: "colors" },
   { name: "Images", description: "Image viewer demo", value: "images" },
+  { name: "Showcase", description: "Reusable image demo", value: "showcase" },
   { name: "About", description: "About this app", value: "about" },
 ]
 
