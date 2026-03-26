@@ -4,6 +4,20 @@ import { z } from "zod";
 import { createIPCServer, type RenderMessage, type AddSeriesMessage } from "./ipc.js";
 import { ensurePane, closePane } from "./tmux-manager.js";
 
+type ToolResult = { content: { type: "text"; text: string }[]; isError?: boolean };
+
+function ok(text: string): ToolResult {
+  return { content: [{ type: "text", text }] };
+}
+
+function err(text: string): ToolResult {
+  return { content: [{ type: "text", text }], isError: true };
+}
+
+function toErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 const server = new McpServer({
   name: "splash",
   version: "0.1.0",
@@ -19,7 +33,6 @@ async function getIPC() {
   return ipc;
 }
 
-// Wait for the renderer to connect after spawning a pane
 async function waitForClient(ipc: ReturnType<typeof createIPCServer>, timeoutMs = 10000): Promise<boolean> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -64,25 +77,12 @@ server.tool(
   async ({ spec, state, title, position, size, mode, chartId }) => {
     try {
       const ipcServer = await getIPC();
-
-      // Ensure tmux pane is running
       await ensurePane({ position, size });
 
-      // Wait for the renderer to connect
-      const connected = await waitForClient(ipcServer);
-      if (!connected) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: "Renderer failed to connect within timeout. Is the tmux pane running?",
-            },
-          ],
-          isError: true,
-        };
+      if (!(await waitForClient(ipcServer))) {
+        return err("Renderer failed to connect within timeout. Is the tmux pane running?");
       }
 
-      // Send the spec
       const message: RenderMessage = {
         type: "render",
         spec,
@@ -91,38 +91,13 @@ server.tool(
         ...(chartId && { chartId }),
       };
 
-      const sent = ipcServer.sendSpec(message);
-
-      if (!sent) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: "No renderer connected. The tmux pane may have crashed.",
-            },
-          ],
-          isError: true,
-        };
+      if (!ipcServer.sendSpec(message)) {
+        return err("No renderer connected. The tmux pane may have crashed.");
       }
 
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Rendered successfully${title ? `: ${title}` : ""}.`,
-          },
-        ],
-      };
+      return ok(`Rendered successfully${title ? `: ${title}` : ""}.`);
     } catch (error) {
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-          },
-        ],
-        isError: true,
-      };
+      return err(`Error: ${toErrorMessage(error)}`);
     }
   }
 );
@@ -153,12 +128,7 @@ server.tool(
       const ipcServer = await getIPC();
 
       if (!ipcServer.hasClients()) {
-        return {
-          content: [
-            { type: "text" as const, text: "No renderer connected. Render a chart first." },
-          ],
-          isError: true,
-        };
+        return err("No renderer connected. Render a chart first.");
       }
 
       const message: AddSeriesMessage = {
@@ -167,35 +137,13 @@ server.tool(
         series: { data, label, color, fill },
       };
 
-      const sent = ipcServer.sendSpec(message);
-
-      if (!sent) {
-        return {
-          content: [
-            { type: "text" as const, text: "Failed to send to renderer." },
-          ],
-          isError: true,
-        };
+      if (!ipcServer.sendSpec(message)) {
+        return err("Failed to send to renderer.");
       }
 
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Added series${label ? ` "${label}"` : ""} to chart${chartId ? ` "${chartId}"` : ""}.`,
-          },
-        ],
-      };
+      return ok(`Added series${label ? ` "${label}"` : ""} to chart${chartId ? ` "${chartId}"` : ""}.`);
     } catch (error) {
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-          },
-        ],
-        isError: true,
-      };
+      return err(`Error: ${toErrorMessage(error)}`);
     }
   }
 );
@@ -206,26 +154,13 @@ server.tool(
   async () => {
     try {
       await closePane();
-      return {
-        content: [
-          { type: "text" as const, text: "Render pane closed." },
-        ],
-      };
+      return ok("Render pane closed.");
     } catch (error) {
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Error closing pane: ${error instanceof Error ? error.message : String(error)}`,
-          },
-        ],
-        isError: true,
-      };
+      return err(`Error closing pane: ${toErrorMessage(error)}`);
     }
   }
 );
 
-// Cleanup on exit
 async function cleanup() {
   ipc?.close();
   await closePane();
