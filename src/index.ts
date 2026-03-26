@@ -56,8 +56,12 @@ server.tool(
       .enum(["replace", "append", "clear"])
       .optional()
       .describe("replace (default): replace current content. append: add below existing. clear: remove all content."),
+    chartId: z
+      .string()
+      .optional()
+      .describe("Optional ID for the chart, used to target it with add_series later."),
   },
-  async ({ spec, state, title, position, size, mode }) => {
+  async ({ spec, state, title, position, size, mode, chartId }) => {
     try {
       const ipcServer = await getIPC();
 
@@ -79,8 +83,9 @@ server.tool(
       }
 
       // Send the spec
-      const message: SpecMessage = { spec, mode: mode ?? "replace" };
+      const message: SpecMessage = { type: "render", spec, mode: mode ?? "replace" };
       if (state) message.state = state;
+      if (chartId) message.chartId = chartId;
 
       const sent = ipcServer.sendSpec(message);
 
@@ -101,6 +106,79 @@ server.tool(
           {
             type: "text" as const,
             text: `Rendered successfully${title ? `: ${title}` : ""}.`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.tool(
+  "add_series",
+  "Add a data series to an existing LineChart in the render pane. No need to resend existing data.",
+  {
+    chartId: z
+      .string()
+      .optional()
+      .describe("ID of the chart to add to. If omitted, adds to the last rendered chart."),
+    data: z
+      .array(z.number())
+      .describe("Array of numeric data points for the new series."),
+    label: z.string().optional().describe("Legend label for the series."),
+    color: z
+      .string()
+      .optional()
+      .describe("Color for the series (e.g. cyan, yellow, red, magenta)."),
+    fill: z
+      .boolean()
+      .optional()
+      .describe("Whether to fill below the line."),
+  },
+  async ({ chartId, data, label, color, fill }) => {
+    try {
+      const ipcServer = await getIPC();
+
+      if (!ipcServer.hasClients()) {
+        return {
+          content: [
+            { type: "text" as const, text: "No renderer connected. Render a chart first." },
+          ],
+          isError: true,
+        };
+      }
+
+      const message: SpecMessage = {
+        type: "add_series",
+        chartId,
+        series: { data, label, color, fill },
+      };
+
+      const sent = ipcServer.sendSpec(message);
+
+      if (!sent) {
+        return {
+          content: [
+            { type: "text" as const, text: "Failed to send to renderer." },
+          ],
+          isError: true,
+        };
+      }
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Added series${label ? ` "${label}"` : ""} to chart${chartId ? ` "${chartId}"` : ""}.`,
           },
         ],
       };

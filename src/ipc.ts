@@ -5,12 +5,22 @@ import path from "node:path";
 const SOCKET_PATH = "/tmp/json-render-terminal.sock";
 
 export interface SpecMessage {
-  spec: {
+  type?: "render" | "add_series";
+  // For type: "render"
+  spec?: {
     root: string;
     elements: Record<string, unknown>;
   };
   state?: Record<string, unknown>;
   mode?: "replace" | "append" | "clear";
+  // For type: "add_series"
+  chartId?: string;
+  series?: {
+    data: number[];
+    label?: string;
+    color?: string;
+    fill?: boolean;
+  };
 }
 
 /**
