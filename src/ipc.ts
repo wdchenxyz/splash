@@ -113,5 +113,3 @@ export function connectClient(
     socket.on("error", reject);
   });
 }
-
-export { SOCKET_PATH };
