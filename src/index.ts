@@ -52,8 +52,12 @@ server.tool(
       .number()
       .optional()
       .describe("Pane size as percentage (default: 40)"),
+    mode: z
+      .enum(["replace", "append", "clear"])
+      .optional()
+      .describe("replace (default): replace current content. append: add below existing. clear: remove all content."),
   },
-  async ({ spec, state, title, position, size }) => {
+  async ({ spec, state, title, position, size, mode }) => {
     try {
       const ipcServer = await getIPC();
 
@@ -75,7 +79,7 @@ server.tool(
       }
 
       // Send the spec
-      const message: SpecMessage = { spec };
+      const message: SpecMessage = { spec, mode: mode ?? "replace" };
       if (state) message.state = state;
 
       const sent = ipcServer.sendSpec(message);

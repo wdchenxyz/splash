@@ -10,6 +10,7 @@ export interface SpecMessage {
     elements: Record<string, unknown>;
   };
   state?: Record<string, unknown>;
+  mode?: "replace" | "append" | "clear";
 }
 
 /**

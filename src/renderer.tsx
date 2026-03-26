@@ -1,11 +1,15 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { render, Box, Text } from "ink";
 import { Renderer, JSONUIProvider } from "@json-render/ink";
 import { connectClient, type SpecMessage } from "./ipc.js";
 
+interface SpecEntry {
+  spec: SpecMessage["spec"];
+  state: Record<string, unknown>;
+}
+
 function App() {
-  const [spec, setSpec] = useState<SpecMessage["spec"] | null>(null);
-  const [state, setState] = useState<Record<string, unknown>>({});
+  const [specs, setSpecs] = useState<SpecEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
 
@@ -16,9 +20,18 @@ function App() {
 
     function connect() {
       connectClient((message) => {
-        setSpec(message.spec);
-        if (message.state) {
-          setState(message.state);
+        const entry: SpecEntry = {
+          spec: message.spec,
+          state: message.state ?? {},
+        };
+        const mode = message.mode ?? "replace";
+
+        if (mode === "clear") {
+          setSpecs([]);
+        } else if (mode === "append") {
+          setSpecs((prev) => [...prev, entry]);
+        } else {
+          setSpecs([entry]);
         }
         setError(null);
       })
@@ -55,7 +68,7 @@ function App() {
     );
   }
 
-  if (!spec) {
+  if (specs.length === 0) {
     return (
       <Box padding={1}>
         <Text color="gray">Waiting for data...</Text>
@@ -65,9 +78,11 @@ function App() {
 
   return (
     <Box flexDirection="column">
-      <JSONUIProvider initialState={state}>
-        <Renderer spec={spec} />
-      </JSONUIProvider>
+      {specs.map((entry, i) => (
+        <JSONUIProvider key={i} initialState={entry.state}>
+          <Renderer spec={entry.spec} />
+        </JSONUIProvider>
+      ))}
     </Box>
   );
 }
