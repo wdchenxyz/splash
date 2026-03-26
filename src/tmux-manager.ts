@@ -43,7 +43,7 @@ export function ensurePane(options: PaneOptions = {}): string {
   const rendererPath = path.join(__dirname, "renderer.js");
 
   const splitFlag = position === "right" ? "-h" : "-v";
-  const cmd = `tmux split-window ${splitFlag} -p ${size} -P -F '#{pane_id}' 'node ${rendererPath}'`;
+  const cmd = `tmux split-window -d ${splitFlag} -p ${size} -P -F '#{pane_id}' 'node ${rendererPath}'`;
 
   const paneId = execSync(cmd, { encoding: "utf-8" }).trim();
   managedPaneId = paneId;
