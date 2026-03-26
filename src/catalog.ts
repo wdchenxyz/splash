@@ -1,6 +1,7 @@
 import { standardComponents } from "@json-render/ink";
+import { LineChart } from "./components/line-chart.js";
 
-// Pass standardComponents directly as the registry — they already
-// accept { element, children } which is what the Renderer provides.
-// Using defineRegistry would double-unwrap (element.props → props.props).
-export const registry = standardComponents;
+export const registry: Record<string, any> = {
+  ...standardComponents,
+  LineChart,
+};

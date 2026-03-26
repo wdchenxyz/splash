@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { render, Box, Text } from "ink";
 import { Renderer, JSONUIProvider } from "@json-render/ink";
+import { registry } from "./catalog.js";
 import { connectClient, type SpecMessage } from "./ipc.js";
 
 interface SpecEntry {
@@ -80,7 +81,7 @@ function App() {
     <Box flexDirection="column">
       {specs.map((entry, i) => (
         <JSONUIProvider key={i} initialState={entry.state}>
-          <Renderer spec={entry.spec} />
+          <Renderer spec={entry.spec} registry={registry} />
         </JSONUIProvider>
       ))}
     </Box>
