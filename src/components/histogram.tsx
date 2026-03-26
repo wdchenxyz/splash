@@ -17,6 +17,17 @@ interface HistogramProps {
 
 const BLOCK_CHARS = [" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"];
 
+function stats(data: number[], fmt: (v: number) => string): string {
+  const n = data.length;
+  let sum = 0;
+  for (const v of data) sum += v;
+  const mean = sum / n;
+  let sqDiffSum = 0;
+  for (const v of data) sqDiffSum += (v - mean) ** 2;
+  const stddev = Math.sqrt(sqDiffSum / n);
+  return `n=${n}  μ=${fmt(mean)}  σ=${fmt(stddev)}`;
+}
+
 export function Histogram({ element }: HistogramProps) {
   const p = element.props;
   const data = p.data ?? [];
@@ -27,8 +38,12 @@ export function Histogram({ element }: HistogramProps) {
   const color = p.color ?? "green";
   const showValues = p.showValues !== false;
 
-  const min = Math.min(...data);
-  const max = Math.max(...data);
+  let min = Infinity;
+  let max = -Infinity;
+  for (const v of data) {
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
   const range = max - min || 1;
   const binWidth = range / binCount;
 
@@ -80,9 +95,7 @@ export function Histogram({ element }: HistogramProps) {
       </Text>
       <Text dimColor>
         {"".padStart(labelWidth + 2)}
-        {"n=" + data.length}
-        {"  μ=" + fmt(data.reduce((a, b) => a + b, 0) / data.length)}
-        {"  σ=" + fmt(Math.sqrt(data.reduce((a, b) => a + (b - data.reduce((x, y) => x + y, 0) / data.length) ** 2, 0) / data.length))}
+        {stats(data, fmt)}
       </Text>
     </Box>
   );
