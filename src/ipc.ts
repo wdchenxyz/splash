@@ -2,7 +2,7 @@ import net from "node:net";
 import fs from "node:fs";
 import path from "node:path";
 
-const SOCKET_PATH = "/tmp/json-render-terminal.sock";
+const SOCKET_PATH = "/tmp/splash.sock";
 
 export interface SpecMessage {
   type?: "render" | "add_series";

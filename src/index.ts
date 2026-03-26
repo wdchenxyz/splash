@@ -5,7 +5,7 @@ import { createIPCServer, type SpecMessage } from "./ipc.js";
 import { ensurePane, closePane } from "./tmux-manager.js";
 
 const server = new McpServer({
-  name: "json-render-terminal",
+  name: "splash",
   version: "0.1.0",
 });
 
@@ -237,7 +237,7 @@ process.on("SIGTERM", () => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("json-render-terminal MCP server running on stdio");
+  console.error("splash MCP server running on stdio");
 }
 
 main().catch((error) => {
