@@ -169,14 +169,6 @@ export function LineChart({ element }: LineChartProps) {
         return (
           <Text key={r}>
             {showAxis && <Text dimColor>{axisLabel}</Text>}
-            {grids.map((g, gi) => {
-              // Render this series' dots for this row, but only where it has data
-              // For overlapping, we render each series as a separate Text span
-              // with its color, but only for cells where this series has dots
-              // and no earlier series already covered
-              return null; // handled below
-            })}
-            {/* Merge approach: render char-by-char with color from the last series that has dots */}
             {Array.from({ length: chartWidth }, (_, c) => {
               // Find which series contribute dots to this cell
               let combined = 0;
