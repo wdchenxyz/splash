@@ -1,7 +1,9 @@
-import { execSync, execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+const exec = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let managedPaneId: string | null = null;
@@ -11,52 +13,48 @@ export interface PaneOptions {
   size?: number; // percentage, default 40
 }
 
-function isTmux(): boolean {
+async function isTmux(): Promise<boolean> {
   return !!process.env.TMUX;
 }
 
-function paneExists(paneId: string): boolean {
+async function paneExists(paneId: string): Promise<boolean> {
   try {
-    const output = execSync("tmux list-panes -F '#{pane_id}'", {
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    return output.includes(paneId);
+    const { stdout } = await exec("tmux", ["list-panes", "-F", "#{pane_id}"]);
+    return stdout.includes(paneId);
   } catch {
     return false;
   }
 }
 
-export function ensurePane(options: PaneOptions = {}): string {
-  if (!isTmux()) {
+export async function ensurePane(options: PaneOptions = {}): Promise<string> {
+  if (!(await isTmux())) {
     throw new Error(
       "Not running inside tmux. Start Claude Code in a tmux session to use terminal rendering."
     );
   }
 
-  // Check if existing pane is still alive
-  if (managedPaneId && paneExists(managedPaneId)) {
+  if (managedPaneId && (await paneExists(managedPaneId))) {
     return managedPaneId;
   }
 
   const { position = "right", size = 40 } = options;
   const rendererPath = path.join(__dirname, "renderer.js");
-
   const splitFlag = position === "right" ? "-h" : "-v";
-  const cmd = `tmux split-window -d ${splitFlag} -p ${size} -P -F '#{pane_id}' 'node ${rendererPath}'`;
 
-  const paneId = execSync(cmd, { encoding: "utf-8" }).trim();
-  managedPaneId = paneId;
+  const { stdout } = await exec("tmux", [
+    "split-window", "-d", splitFlag, "-p", String(size),
+    "-P", "-F", "#{pane_id}",
+    `node ${rendererPath}`,
+  ]);
 
-  return paneId;
+  managedPaneId = stdout.trim();
+  return managedPaneId;
 }
 
-export function closePane(): void {
+export async function closePane(): Promise<void> {
   if (managedPaneId) {
     try {
-      execSync(`tmux kill-pane -t ${managedPaneId}`, {
-        stdio: ["pipe", "pipe", "pipe"],
-      });
+      await exec("tmux", ["kill-pane", "-t", managedPaneId]);
     } catch {
       // pane may already be gone
     }

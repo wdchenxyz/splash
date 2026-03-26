@@ -66,7 +66,7 @@ server.tool(
       const ipcServer = await getIPC();
 
       // Ensure tmux pane is running
-      ensurePane({ position, size });
+      await ensurePane({ position, size });
 
       // Wait for the renderer to connect
       const connected = await waitForClient(ipcServer);
@@ -201,7 +201,7 @@ server.tool(
   "Close the terminal rendering pane.",
   async () => {
     try {
-      closePane();
+      await closePane();
       return {
         content: [
           { type: "text" as const, text: "Render pane closed." },
@@ -222,17 +222,14 @@ server.tool(
 );
 
 // Cleanup on exit
-process.on("SIGINT", () => {
+async function cleanup() {
   ipc?.close();
-  closePane();
+  await closePane();
   process.exit(0);
-});
+}
 
-process.on("SIGTERM", () => {
-  ipc?.close();
-  closePane();
-  process.exit(0);
-});
+process.on("SIGINT", cleanup);
+process.on("SIGTERM", cleanup);
 
 async function main() {
   const transport = new StdioServerTransport();
