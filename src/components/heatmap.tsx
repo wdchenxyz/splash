@@ -1,23 +1,26 @@
 import React from "react";
 import { Box, Text } from "ink";
 
-// Block shading characters from empty to full
-const SHADE_CHARS = [" ", "░", "▒", "▓", "█"];
+// Color gradients: array of hex colors from low to high intensity
+const GRADIENTS: Record<string, string[]> = {
+  green:   ["#0a2e0a", "#0f4f0f", "#1a7a1a", "#2eaa2e", "#50d050", "#80ff80"],
+  red:     ["#2e0a0a", "#4f0f0f", "#7a1a1a", "#aa2e2e", "#d05050", "#ff8080"],
+  blue:    ["#0a0a2e", "#0f0f4f", "#1a1a7a", "#2e2eaa", "#5050d0", "#8080ff"],
+  yellow:  ["#2e2e0a", "#4f4f0f", "#7a7a1a", "#aaaa2e", "#d0d050", "#ffff80"],
+  cyan:    ["#0a2e2e", "#0f4f4f", "#1a7a7a", "#2eaaaa", "#50d0d0", "#80ffff"],
+  magenta: ["#2e0a2e", "#4f0f4f", "#7a1a7a", "#aa2eaa", "#d050d0", "#ff80ff"],
+  white:   ["#1a1a1a", "#333333", "#555555", "#888888", "#bbbbbb", "#eeeeee"],
+};
 
 interface HeatmapProps {
   element: {
     props: {
-      // 2D array of numbers, rows x cols
       data: number[][];
-      // Optional labels
       xLabels?: string[];
       yLabels?: string[];
       label?: string;
-      // Color theme
-      color?: "green" | "red" | "blue" | "yellow" | "cyan" | "magenta" | "white";
-      // Show values in cells
+      color?: string;
       showValues?: boolean;
-      // Cell width in characters
       cellWidth?: number;
     };
   };
@@ -39,15 +42,18 @@ function normalize(data: number[][]): { normalized: number[][]; min: number; max
   return { normalized, min, max };
 }
 
-function getShade(value: number): string {
-  const idx = Math.min(SHADE_CHARS.length - 1, Math.round(value * (SHADE_CHARS.length - 1)));
-  return SHADE_CHARS[idx];
-}
-
 function formatVal(v: number, range: number): string {
   if (range < 1) return v.toFixed(2);
   if (range < 10) return v.toFixed(1);
   return Math.round(v).toString();
+}
+
+function getColor(value: number, gradient: string[]): string {
+  const idx = Math.min(
+    gradient.length - 1,
+    Math.round(value * (gradient.length - 1))
+  );
+  return gradient[idx];
 }
 
 export function Heatmap({ element }: HeatmapProps) {
@@ -55,7 +61,8 @@ export function Heatmap({ element }: HeatmapProps) {
   const data = p.data ?? [];
   if (data.length === 0) return null;
 
-  const color = p.color ?? "green";
+  const colorName = p.color ?? "green";
+  const gradient = GRADIENTS[colorName] ?? GRADIENTS.green;
   const showValues = p.showValues ?? false;
   const cellWidth = p.cellWidth ?? (showValues ? 6 : 2);
   const { normalized, min, max } = normalize(data);
@@ -78,18 +85,18 @@ export function Heatmap({ element }: HeatmapProps) {
             </Text>
           )}
           {row.map((val, ci) => {
-            const shade = getShade(val);
-            const cell = showValues
-              ? formatVal(data[ri][ci], range).padStart(cellWidth - 1) + " "
-              : shade.repeat(cellWidth);
+            const bg = getColor(val, gradient);
+            if (showValues) {
+              const textColor = val > 0.5 ? "#000000" : "#ffffff";
+              return (
+                <Text key={ci} backgroundColor={bg} color={textColor}>
+                  {formatVal(data[ri][ci], range).padStart(cellWidth - 1) + " "}
+                </Text>
+              );
+            }
             return (
-              <Text
-                key={ci}
-                color={val > 0.5 ? "white" : color}
-                backgroundColor={val > 0.7 ? color : undefined}
-                dimColor={val < 0.3}
-              >
-                {cell}
+              <Text key={ci} backgroundColor={bg}>
+                {" ".repeat(cellWidth)}
               </Text>
             );
           })}
@@ -109,12 +116,9 @@ export function Heatmap({ element }: HeatmapProps) {
       )}
       {/* Legend */}
       <Box marginTop={1}>
-        <Text dimColor>
-          {formatVal(min, range)} </Text>
-        {SHADE_CHARS.map((ch, i) => (
-          <Text key={i} color={color} dimColor={i < 2}>
-            {ch === " " ? "·" : ch}
-          </Text>
+        <Text dimColor>{formatVal(min, range)} </Text>
+        {gradient.map((c, i) => (
+          <Text key={i} backgroundColor={c}>{"  "}</Text>
         ))}
         <Text dimColor> {formatVal(max, range)}</Text>
       </Box>
