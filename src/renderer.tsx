@@ -2,11 +2,21 @@ import React, { useState, useEffect, useCallback } from "react";
 import { render, Box, Text } from "ink";
 import { Renderer, JSONUIProvider } from "@json-render/ink";
 import { registry } from "./catalog.js";
-import { connectClient, type SpecMessage } from "./ipc.js";
+import {
+  connectClient,
+  type SpecMessage,
+  type SeriesData,
+} from "./ipc.js";
+
+interface ElementDef {
+  type: string;
+  props: Record<string, unknown>;
+  children?: string[];
+}
 
 interface Spec {
   root: string;
-  elements: Record<string, any>;
+  elements: Record<string, ElementDef>;
 }
 
 interface SpecEntry {
@@ -17,29 +27,25 @@ interface SpecEntry {
 
 let entryCounter = 0;
 
-function addSeriesToSpec(spec: Spec, series: SpecMessage["series"]): Spec {
-  if (!series) return spec;
-
-  // Find the LineChart element in the spec
+function addSeriesToSpec(spec: Spec, series: SeriesData): Spec {
   const elements = { ...spec.elements };
   for (const [key, el] of Object.entries(elements)) {
-    if ((el as any).type === "LineChart") {
-      const props = { ...(el as any).props };
-      // Initialize series array if using single-data format
-      if (!props.series) {
+    if (el.type === "LineChart") {
+      const props = { ...el.props };
+      const existing = props.series as SeriesData[] | undefined;
+      if (!existing) {
         props.series = props.data
-          ? [{ data: props.data, label: props.label, color: props.color, fill: props.fill }]
+          ? [{ data: props.data as number[], label: props.label as string, color: props.color as string, fill: props.fill as boolean }]
           : [];
         delete props.data;
       } else {
-        props.series = [...props.series];
+        props.series = [...existing];
       }
-      props.series.push(series);
-      elements[key] = { ...(el as any), props };
+      (props.series as SeriesData[]).push(series);
+      elements[key] = { ...el, props };
       break;
     }
   }
-
   return { ...spec, elements };
 }
 
@@ -49,40 +55,30 @@ function App() {
   const [connected, setConnected] = useState(false);
 
   const handleMessage = useCallback((message: SpecMessage) => {
-    const msgType = message.type ?? "render";
-
-    if (msgType === "add_series") {
+    if (message.type === "add_series") {
       setSpecs((prev) => {
-        const chartId = message.chartId;
-        // Find the spec entry containing the chart
-        // If chartId given, match by id; otherwise update the last spec
-        const idx = chartId
-          ? prev.findIndex((e) => e.id === chartId)
+        const idx = message.chartId
+          ? prev.findIndex((e) => e.id === message.chartId)
           : prev.length - 1;
-
         if (idx < 0) return prev;
 
         const entry = prev[idx];
-        const newSpec = addSeriesToSpec(entry.spec, message.series);
         const updated = [...prev];
-        updated[idx] = { ...entry, spec: newSpec };
+        updated[idx] = { ...entry, spec: addSeriesToSpec(entry.spec, message.series) };
         return updated;
       });
       return;
     }
 
-    // type: "render"
     const mode = message.mode ?? "replace";
     if (mode === "clear") {
       setSpecs([]);
       return;
     }
 
-    if (!message.spec) return;
-
     const entry: SpecEntry = {
       id: message.chartId ?? `spec-${entryCounter++}`,
-      spec: message.spec,
+      spec: message.spec as Spec,
       state: message.state ?? {},
     };
 

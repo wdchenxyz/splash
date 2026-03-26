@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { createIPCServer, type SpecMessage } from "./ipc.js";
+import { createIPCServer, type RenderMessage, type AddSeriesMessage } from "./ipc.js";
 import { ensurePane, closePane } from "./tmux-manager.js";
 
 const server = new McpServer({
@@ -83,9 +83,13 @@ server.tool(
       }
 
       // Send the spec
-      const message: SpecMessage = { type: "render", spec, mode: mode ?? "replace" };
-      if (state) message.state = state;
-      if (chartId) message.chartId = chartId;
+      const message: RenderMessage = {
+        type: "render",
+        spec,
+        mode: mode ?? "replace",
+        ...(state && { state }),
+        ...(chartId && { chartId }),
+      };
 
       const sent = ipcServer.sendSpec(message);
 
@@ -157,7 +161,7 @@ server.tool(
         };
       }
 
-      const message: SpecMessage = {
+      const message: AddSeriesMessage = {
         type: "add_series",
         chartId,
         series: { data, label, color, fill },

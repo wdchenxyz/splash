@@ -1,27 +1,30 @@
 import net from "node:net";
 import fs from "node:fs";
-import path from "node:path";
 
 const SOCKET_PATH = "/tmp/splash.sock";
 
-export interface SpecMessage {
-  type?: "render" | "add_series";
-  // For type: "render"
-  spec?: {
-    root: string;
-    elements: Record<string, unknown>;
-  };
+export interface SeriesData {
+  data: number[];
+  label?: string;
+  color?: string;
+  fill?: boolean;
+}
+
+export interface RenderMessage {
+  type: "render";
+  spec: { root: string; elements: Record<string, unknown> };
   state?: Record<string, unknown>;
   mode?: "replace" | "append" | "clear";
-  // For type: "add_series"
   chartId?: string;
-  series?: {
-    data: number[];
-    label?: string;
-    color?: string;
-    fill?: boolean;
-  };
 }
+
+export interface AddSeriesMessage {
+  type: "add_series";
+  chartId?: string;
+  series: SeriesData;
+}
+
+export type SpecMessage = RenderMessage | AddSeriesMessage;
 
 /**
  * Server side — used by the MCP server to send specs to the renderer.
