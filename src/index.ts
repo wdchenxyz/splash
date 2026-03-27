@@ -48,6 +48,24 @@ const chartIdSchema = z
   .optional()
   .describe("Optional ID for the chart, used to target it with add_series later.");
 
+function rewriteImagePaths(
+  spec: { root: string; elements: Record<string, unknown> },
+  port: number
+): { root: string; elements: Record<string, unknown> } {
+  const elements = { ...spec.elements };
+  for (const [id, raw] of Object.entries(elements)) {
+    const el = raw as { type?: string; props?: Record<string, unknown> };
+    if (el.type === "Image" && typeof el.props?.src === "string" && el.props.src.startsWith("/")) {
+      const encoded = Buffer.from(el.props.src).toString("base64url");
+      elements[id] = {
+        ...el,
+        props: { ...el.props, src: `http://localhost:${port}/files/${encoded}` },
+      };
+    }
+  }
+  return { ...spec, elements };
+}
+
 // -- Tmux renderer --
 
 let ipc: ReturnType<typeof createIPCServer> | null = null;
@@ -163,9 +181,12 @@ server.tool(
       const srv = getBrowser();
       const url = await srv.start();
 
+      const port = srv.getPort()!;
+      const rewrittenSpec = rewriteImagePaths(spec, port);
+
       const message: RenderMessage = {
         type: "render",
-        spec,
+        spec: rewrittenSpec,
         mode: mode ?? "replace",
         ...(state && { state }),
         ...(chartId && { chartId }),
