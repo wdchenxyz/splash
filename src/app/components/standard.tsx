@@ -3,17 +3,18 @@ import React, { type ReactNode, type CSSProperties } from "react";
 // -- Layout --
 
 export function Box({ props, children }: { props: Record<string, unknown>; children?: ReactNode }) {
+  const dir = (props.flexDirection as string) ?? "row";
   const style: CSSProperties = {
     display: "flex",
-    flexDirection: (props.flexDirection as CSSProperties["flexDirection"]) ?? "row",
-    alignItems: (props.alignItems as CSSProperties["alignItems"]) ?? undefined,
+    flexDirection: dir as CSSProperties["flexDirection"],
+    alignItems: (props.alignItems as CSSProperties["alignItems"]) ?? (dir === "row" ? "flex-start" : undefined),
     justifyContent: (props.justifyContent as CSSProperties["justifyContent"]) ?? undefined,
-    flexGrow: (props.flexGrow as number) ?? undefined,
+    flexGrow: (props.flexGrow as number) ?? 1,
     flexShrink: (props.flexShrink as number) ?? undefined,
     flexWrap: (props.flexWrap as CSSProperties["flexWrap"]) ?? undefined,
     gap: props.gap != null ? (props.gap as number) * 8 : undefined,
     padding: props.padding != null ? (props.padding as number) * 8 : undefined,
-    width: props.width as CSSProperties["width"],
+    width: (props.width as CSSProperties["width"]) ?? "100%",
     height: props.height as CSSProperties["height"],
     borderStyle: props.borderStyle ? "solid" : undefined,
     borderWidth: props.borderStyle ? 1 : undefined,
@@ -253,7 +254,7 @@ export function Sparkline({ props }: { props: Record<string, unknown> }) {
   return (
     <div>
       {props.label && <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 2 }}>{props.label as string}</div>}
-      <svg viewBox={`0 0 ${width} ${height}`} style={{ width, height }}>
+      <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", height }}>
         <polyline points={points} fill="none" stroke={color} strokeWidth={1.5} />
       </svg>
     </div>
@@ -271,16 +272,16 @@ export function BarChart({ props }: { props: Record<string, unknown> }) {
   const total = data.reduce((s, d) => s + d.value, 0);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1, width: "100%" }}>
       {data.map((d, i) => {
-        const w = maxVal > 0 ? (d.value / maxVal) * barWidth : 0;
+        const pct = maxVal > 0 ? (d.value / maxVal) * 100 : 0;
         return (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ color: "#9ca3af", fontSize: 12, minWidth: 60, textAlign: "right" }}>{d.label}</span>
-            <div style={{ width: barWidth, height: 16, position: "relative" }}>
-              <div style={{ width: w, height: "100%", backgroundColor: d.color ?? "#22c55e", borderRadius: 3 }} />
+            <span style={{ color: "#9ca3af", fontSize: 12, minWidth: 100, textAlign: "right", flexShrink: 0 }}>{d.label}</span>
+            <div style={{ flex: 1, height: 16, position: "relative" }}>
+              <div style={{ width: `${pct}%`, height: "100%", backgroundColor: d.color ?? "#22c55e", borderRadius: 3 }} />
             </div>
-            {showValues && <span style={{ fontSize: 12, color: "#9ca3af" }}>{d.value}{showPercentage ? ` (${Math.round((d.value / total) * 100)}%)` : ""}</span>}
+            {showValues && <span style={{ fontSize: 12, color: "#9ca3af", flexShrink: 0 }}>{d.value}{showPercentage ? ` (${Math.round((d.value / total) * 100)}%)` : ""}</span>}
           </div>
         );
       })}
@@ -293,7 +294,7 @@ export function Table({ props }: { props: Record<string, unknown> }) {
   const rows = (props.rows as Array<Record<string, string>>) ?? [];
 
   return (
-    <table style={{ borderCollapse: "collapse", fontSize: 13 }}>
+    <table style={{ borderCollapse: "collapse", fontSize: 13, width: "100%" }}>
       <thead>
         <tr>
           {columns.map((col, i) => (

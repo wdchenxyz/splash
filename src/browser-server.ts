@@ -10,6 +10,7 @@ export function createBrowserServer(port = DEFAULT_PORT) {
   let wss: WebSocketServer | null = null;
   const clients = new Set<WebSocket>();
   let appJs: string | null = null;
+  let lastMessage: string | null = null;
 
   function loadAppJs(): string {
     if (appJs) return appJs;
@@ -26,7 +27,7 @@ export function createBrowserServer(port = DEFAULT_PORT) {
   <title>Splash</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #111827; color: #e5e7eb; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+    body { background: #0a0e17; color: #e5e7eb; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
   </style>
 </head>
 <body>
@@ -57,6 +58,8 @@ export function createBrowserServer(port = DEFAULT_PORT) {
     wss = new WebSocketServer({ server });
     wss.on("connection", (ws) => {
       clients.add(ws);
+      // Replay last spec so refreshes don't show blank page
+      if (lastMessage) ws.send(lastMessage);
       ws.on("close", () => clients.delete(ws));
       ws.on("error", () => clients.delete(ws));
     });
@@ -71,6 +74,7 @@ export function createBrowserServer(port = DEFAULT_PORT) {
 
   function sendSpec(message: SpecMessage): boolean {
     const data = JSON.stringify(message);
+    lastMessage = data;
     let sent = false;
     for (const client of clients) {
       if (client.readyState === WebSocket.OPEN) {

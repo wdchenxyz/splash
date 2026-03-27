@@ -54,7 +54,7 @@ export function Heatmap({ props }: HeatmapProps) {
   const fmtVal = (v: number) => (range < 1 ? v.toFixed(2) : range < 10 ? v.toFixed(1) : Math.round(v).toString());
 
   return (
-    <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ width: "100%", maxWidth: svgWidth, fontFamily: "monospace" }}>
+    <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ width: "100%", fontFamily: "monospace" }}>
       {p.label && (
         <text x={svgWidth / 2} y={16} textAnchor="middle" fontSize="12" fontWeight="bold" fill="#e5e7eb">
           {p.label}

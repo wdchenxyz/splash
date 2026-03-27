@@ -93,7 +93,7 @@ export function LineChart({ props }: LineChartProps) {
   const tickCount = 5;
 
   return (
-    <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ width: "100%", maxWidth: svgWidth, fontFamily: "monospace" }}>
+    <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ width: "100%", fontFamily: "monospace" }}>
       {p.label && (
         <text x={svgWidth / 2} y={14} textAnchor="middle" fontSize="12" fontWeight="bold" fill="#e5e7eb">
           {p.label}

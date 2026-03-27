@@ -57,7 +57,7 @@ export function Histogram({ props }: HistogramProps) {
   const totalH = padding.top + binCount * (barH + 2) + padding.bottom;
 
   return (
-    <svg viewBox={`0 0 ${svgWidth} ${totalH}`} style={{ width: "100%", maxWidth: svgWidth, fontFamily: "monospace" }}>
+    <svg viewBox={`0 0 ${svgWidth} ${totalH}`} style={{ width: "100%", fontFamily: "monospace" }}>
       {p.label && (
         <text x={svgWidth / 2} y={16} textAnchor="middle" fontSize="12" fontWeight="bold" fill="#e5e7eb">
           {p.label}
