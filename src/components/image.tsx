@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Box, Text } from "ink";
 import fs from "node:fs";
 
@@ -55,6 +55,27 @@ interface ImageProps {
 
 export function Image({ element }: ImageProps) {
   const { src, alt = "", width, height } = element.props;
+  const writtenRef = useRef(false);
+
+  useEffect(() => {
+    if (!src || writtenRef.current) return;
+
+    let base64Data: string;
+    try {
+      const buffer = fs.readFileSync(src);
+      base64Data = buffer.toString("base64");
+    } catch {
+      return;
+    }
+
+    const kittyOutput = buildKittySequence(base64Data, width, height);
+    const inTmux = !!process.env.TMUX;
+    const output = inTmux ? wrapTmuxPassthrough(kittyOutput) : kittyOutput;
+
+    // Write directly to stdout — Ink strips raw escape sequences
+    process.stdout.write(output);
+    writtenRef.current = true;
+  }, [src, width, height]);
 
   if (!src) {
     return (
@@ -64,11 +85,8 @@ export function Image({ element }: ImageProps) {
     );
   }
 
-  let base64Data: string;
-  try {
-    const buffer = fs.readFileSync(src);
-    base64Data = buffer.toString("base64");
-  } catch {
+  // Check if file exists for error display
+  if (!fs.existsSync(src)) {
     return (
       <Box>
         <Text color="red">[Image not found: {src}]</Text>
@@ -76,13 +94,8 @@ export function Image({ element }: ImageProps) {
     );
   }
 
-  const kittyOutput = buildKittySequence(base64Data, width, height);
-  const inTmux = !!process.env.TMUX;
-  const output = inTmux ? wrapTmuxPassthrough(kittyOutput) : kittyOutput;
-
   return (
     <Box flexDirection="column">
-      <Text>{output}</Text>
       {alt ? <Text color="gray">{alt}</Text> : null}
     </Box>
   );
