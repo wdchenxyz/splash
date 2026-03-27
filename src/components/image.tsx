@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { Box, Text } from "ink";
+import { Box, Text, useStdout } from "ink";
 import fs from "node:fs";
 
 const CHUNK_SIZE = 4096;
@@ -35,18 +35,6 @@ function wrapTmuxPassthrough(seq: string): string {
   return `\x1bPtmux;${doubled}\x1b\\`;
 }
 
-function writeToTTY(data: string): void {
-  // Open /dev/tty directly to bypass Ink's stdout interception.
-  // Ink takes over process.stdout for its rendering pipeline,
-  // so any escape sequences written there get corrupted.
-  const fd = fs.openSync("/dev/tty", "w");
-  try {
-    fs.writeSync(fd, data);
-  } finally {
-    fs.closeSync(fd);
-  }
-}
-
 interface ImageProps {
   element: {
     props: {
@@ -60,6 +48,7 @@ interface ImageProps {
 
 export function Image({ element }: ImageProps) {
   const { src, alt = "", width, height } = element.props;
+  const { write } = useStdout();
   const writtenRef = useRef(false);
 
   useEffect(() => {
@@ -76,14 +65,14 @@ export function Image({ element }: ImageProps) {
     const inTmux = !!process.env.TMUX;
     const chunks = buildKittyChunks(base64Data, width, height);
 
-    // Write each chunk — wrap in tmux passthrough if inside tmux
+    // Use Ink's write() to output graphics without conflicting with Ink's rendering.
     for (const chunk of chunks) {
       const output = inTmux ? wrapTmuxPassthrough(chunk) : chunk;
-      writeToTTY(output);
+      write(output);
     }
-    writeToTTY("\n");
+    write("\n");
     writtenRef.current = true;
-  }, [src, width, height]);
+  }, [src, width, height, write]);
 
   if (!src) {
     return (
