@@ -52,22 +52,32 @@ function wrapTmuxPassthrough(seq: string): string {
   return `\x1bPtmux;${doubled}\x1b\\`;
 }
 
-function buildPlaceholderText(imageId: number, rows: number, cols: number): string {
-  const lines: string[] = [];
-  for (let r = 0; r < rows; r++) {
-    // First cell: placeholder + row diacritic (column inferred as 0)
-    let line = PLACEHOLDER + diacritic(r);
-    // Remaining cells: bare placeholder (inherits row, column = prev + 1)
-    for (let c = 1; c < cols; c++) {
-      line += PLACEHOLDER;
-    }
-    lines.push(line);
+// Build one row of placeholder characters.
+// First cell has row diacritic, subsequent cells inherit via Kitty's rules.
+function buildPlaceholderRow(row: number, cols: number): string {
+  let line = PLACEHOLDER + diacritic(row);
+  for (let c = 1; c < cols; c++) {
+    line += PLACEHOLDER;
   }
-  // Wrap in ANSI foreground color to encode image ID (256-color mode)
-  return `\x1b[38;5;${imageId}m${lines.join("\n")}\x1b[39m`;
+  return line;
+}
+
+// Convert image ID to hex color for Ink's <Text color> prop.
+// Kitty reads the 24-bit true color foreground as the image ID.
+function imageIdToHex(id: number): string {
+  const r = (id >> 16) & 0xff;
+  const g = (id >> 8) & 0xff;
+  const b = id & 0xff;
+  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
 }
 
 let nextImageId = 1;
+
+interface ImageState {
+  imageId: number;
+  rows: number;
+  cols: number;
+}
 
 interface ImageProps {
   element: {
@@ -83,10 +93,10 @@ interface ImageProps {
 export function Image({ element }: ImageProps) {
   const { src, alt = "", width, height } = element.props;
   const { write } = useStdout();
-  const [placeholder, setPlaceholder] = useState<string | null>(null);
+  const [imageState, setImageState] = useState<ImageState | null>(null);
 
   useEffect(() => {
-    if (!src || placeholder) return;
+    if (!src || imageState) return;
 
     let base64Data: string;
     try {
@@ -104,14 +114,14 @@ export function Image({ element }: ImageProps) {
     const chunks = buildUploadSequence(base64Data, imageId, cols, rows);
 
     // Upload image data to terminal via Ink's write() (escape sequences).
-    // The actual display happens via placeholder characters in the text below.
+    // The actual display happens via placeholder characters rendered by Ink below.
     for (const chunk of chunks) {
       const output = inTmux ? wrapTmuxPassthrough(chunk) : chunk;
       write(output);
     }
 
-    setPlaceholder(buildPlaceholderText(imageId, rows, cols));
-  }, [src, width, height, write, placeholder]);
+    setImageState({ imageId, rows, cols });
+  }, [src, width, height, write, imageState]);
 
   if (!src) {
     return (
@@ -129,7 +139,7 @@ export function Image({ element }: ImageProps) {
     );
   }
 
-  if (!placeholder) {
+  if (!imageState) {
     return (
       <Box>
         <Text color="gray">[Loading: {src}]</Text>
@@ -137,9 +147,17 @@ export function Image({ element }: ImageProps) {
     );
   }
 
+  // Render placeholder grid. Ink's <Text color> sets the foreground color
+  // which Kitty interprets as the image ID (24-bit true color).
+  const hexColor = imageIdToHex(imageState.imageId);
+
   return (
     <Box flexDirection="column">
-      <Text>{placeholder}</Text>
+      {Array.from({ length: imageState.rows }, (_, r) => (
+        <Text key={r} color={hexColor}>
+          {buildPlaceholderRow(r, imageState.cols)}
+        </Text>
+      ))}
       {alt ? <Text color="gray">{alt}</Text> : null}
     </Box>
   );
