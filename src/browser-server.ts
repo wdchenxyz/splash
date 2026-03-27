@@ -137,6 +137,7 @@ export function createBrowserServer(port = DEFAULT_PORT) {
           return;
         }
 
+        filePath = path.resolve(filePath);
         if (!path.isAbsolute(filePath)) {
           res.writeHead(403, { "Content-Type": "text/plain" });
           res.end("Forbidden");
