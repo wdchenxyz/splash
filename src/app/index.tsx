@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
+import { shadcnComponents } from "@json-render/shadcn";
+import { ShadcnBadge, ShadcnProgress } from "./components/shadcn-adapters.js";
 import { LineChart } from "./components/line-chart.js";
 import { Histogram } from "./components/histogram.js";
 import { Heatmap } from "./components/heatmap.js";
 import {
-  Box, Card, Spacer, Newline, Divider, Heading, Text, Badge, StatusLine,
-  KeyValue, Metric, Link, Markdown, Callout, Spinner, ListComponent, ListItem,
-  Timeline, ProgressBar, Sparkline, BarChart, Table,
+  Box, Spacer, Newline, Divider, Text, StatusLine,
+  KeyValue, Metric, Link, Markdown, Callout,
+  ListComponent, ListItem, Timeline, Sparkline, BarChart,
 } from "./components/standard.js";
 
 // -- Direct renderer (no @json-render/react dependency) --
@@ -23,12 +25,22 @@ type Spec = {
 };
 
 const components: Record<string, (p: { props: Record<string, unknown>; children?: ReactNode }) => ReactNode> = {
-  Box, Card,
-  Spacer: () => <Spacer />,
-  Newline, Divider, Heading, Text, Badge, StatusLine,
-  KeyValue, Metric, Link, Markdown, Callout, Spinner,
+  // shadcn components (direct or adapted)
+  Card: shadcnComponents.Card,
+  Heading: shadcnComponents.Heading,
+  Spinner: shadcnComponents.Spinner,
+  Table: shadcnComponents.Table,
+  Badge: ShadcnBadge,
+  ProgressBar: ShadcnProgress,
+
+  // kept custom components
+  Box, Spacer,
+  Newline, Divider, Text, StatusLine,
+  KeyValue, Metric, Link, Markdown, Callout,
   List: ListComponent, ListItem, Timeline,
-  ProgressBar, Sparkline, BarChart, Table,
+  Sparkline, BarChart,
+
+  // custom charts
   LineChart, Histogram, Heatmap,
 };
 

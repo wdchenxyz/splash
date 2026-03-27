@@ -25,15 +25,6 @@ export function Box({ props, children }: { props: Record<string, unknown>; child
   return <div style={style}>{children}</div>;
 }
 
-export function Card({ props, children }: { props: Record<string, unknown>; children?: ReactNode }) {
-  return (
-    <div style={{ border: "1px solid #374151", borderRadius: 6, padding: (props.padding as number ?? 1) * 8, backgroundColor: (props.backgroundColor as string) ?? undefined }}>
-      {props.title && <div style={{ fontWeight: "bold", marginBottom: 8, fontSize: 14 }}>{props.title as string}</div>}
-      {children}
-    </div>
-  );
-}
-
 export function Spacer() {
   return <div style={{ flex: 1 }} />;
 }
@@ -55,16 +46,6 @@ export function Divider({ props }: { props: Record<string, unknown> }) {
 
 // -- Content --
 
-export function Heading({ props }: { props: Record<string, unknown> }) {
-  const level = props.level as string ?? "h1";
-  const sizes: Record<string, number> = { h1: 24, h2: 20, h3: 16, h4: 14 };
-  return (
-    <div style={{ fontSize: sizes[level] ?? 24, fontWeight: "bold", color: (props.color as string) ?? "#e5e7eb", margin: "4px 0" }}>
-      {props.text as string}
-    </div>
-  );
-}
-
 export function Text({ props }: { props: Record<string, unknown> }) {
   const style: CSSProperties = {
     color: (props.color as string) ?? undefined,
@@ -75,22 +56,6 @@ export function Text({ props }: { props: Record<string, unknown> }) {
     opacity: props.dimColor ? 0.6 : undefined,
   };
   return <span style={style}>{props.text as string}</span>;
-}
-
-export function Badge({ props }: { props: Record<string, unknown> }) {
-  const colors: Record<string, { bg: string; fg: string }> = {
-    default: { bg: "#374151", fg: "#e5e7eb" },
-    success: { bg: "#064e3b", fg: "#34d399" },
-    warning: { bg: "#78350f", fg: "#fbbf24" },
-    error: { bg: "#7f1d1d", fg: "#f87171" },
-    info: { bg: "#1e3a5f", fg: "#60a5fa" },
-  };
-  const c = colors[(props.variant as string) ?? "default"] ?? colors.default;
-  return (
-    <span style={{ backgroundColor: c.bg, color: c.fg, padding: "2px 8px", borderRadius: 4, fontSize: 12 }}>
-      {props.label as string}
-    </span>
-  );
 }
 
 export function StatusLine({ props }: { props: Record<string, unknown> }) {
@@ -157,14 +122,6 @@ export function Callout({ props }: { props: Record<string, unknown> }) {
   );
 }
 
-export function Spinner({ props }: { props: Record<string, unknown> }) {
-  return (
-    <div style={{ color: (props.color as string) ?? "#60a5fa" }}>
-      ⠋ {(props.label as string) ?? "Loading..."}
-    </div>
-  );
-}
-
 export function ListComponent({ props }: { props: Record<string, unknown> }) {
   const items = (props.items as string[]) ?? [];
   const ordered = props.ordered as boolean;
@@ -214,23 +171,6 @@ export function Timeline({ props }: { props: Record<string, unknown> }) {
 }
 
 // -- Data Visualization --
-
-export function ProgressBar({ props }: { props: Record<string, unknown> }) {
-  const progress = Math.min(1, Math.max(0, (props.progress as number) ?? 0));
-  const width = ((props.width as number) ?? 40) * 8;
-  const color = (props.color as string) ?? "#22c55e";
-  return (
-    <div>
-      {props.label && <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 2 }}>{props.label as string}</div>}
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ width, height: 8, backgroundColor: "#1f2937", borderRadius: 4, overflow: "hidden" }}>
-          <div style={{ width: `${progress * 100}%`, height: "100%", backgroundColor: color, borderRadius: 4, transition: "width 0.3s" }} />
-        </div>
-        <span style={{ fontSize: 12, color: "#9ca3af" }}>{Math.round(progress * 100)}%</span>
-      </div>
-    </div>
-  );
-}
 
 export function Sparkline({ props }: { props: Record<string, unknown> }) {
   const data = (props.data as number[]) ?? [];
@@ -289,32 +229,3 @@ export function BarChart({ props }: { props: Record<string, unknown> }) {
   );
 }
 
-export function Table({ props }: { props: Record<string, unknown> }) {
-  const columns = (props.columns as Array<{ header: string; key: string; width?: number; align?: string }>) ?? [];
-  const rows = (props.rows as Array<Record<string, string>>) ?? [];
-
-  return (
-    <table style={{ borderCollapse: "collapse", fontSize: 13, width: "100%" }}>
-      <thead>
-        <tr>
-          {columns.map((col, i) => (
-            <th key={i} style={{ padding: "6px 12px", borderBottom: "2px solid #374151", textAlign: (col.align as "left" | "right" | "center") ?? "left", color: (props.headerColor as string) ?? "#9ca3af", fontWeight: "bold" }}>
-              {col.header}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row, ri) => (
-          <tr key={ri}>
-            {columns.map((col, ci) => (
-              <td key={ci} style={{ padding: "4px 12px", borderBottom: "1px solid #1f2937", textAlign: (col.align as "left" | "right" | "center") ?? "left" }}>
-                {row[col.key] ?? ""}
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
