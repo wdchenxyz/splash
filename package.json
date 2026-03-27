@@ -13,7 +13,7 @@
   "dependencies": {
     "@json-render/core": "0.15.0",
     "@json-render/ink": "0.15.0",
-    "@json-render/shadcn": "^0.15.0",
+    "@json-render/shadcn": "0.15.0",
     "@modelcontextprotocol/sdk": "^1.28.0",
     "ink": "^6.0.0",
     "react": "^19.0.0",

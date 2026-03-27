@@ -15,7 +15,7 @@ importers:
         specifier: 0.15.0
         version: 0.15.0(ink@6.8.0(@types/react@19.2.14)(react@19.2.4))(react@19.2.4)(zod@4.3.6)
       '@json-render/shadcn':
-        specifier: ^0.15.0
+        specifier: 0.15.0
         version: 0.15.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(tailwindcss@4.2.2)(zod@4.3.6)
       '@modelcontextprotocol/sdk':
         specifier: ^1.28.0
