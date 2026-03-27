@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Box, Text, useStdout } from "ink";
+import { Box, Text } from "ink";
 import fs from "node:fs";
 
 const CHUNK_SIZE = 4096;
@@ -92,7 +92,6 @@ interface ImageProps {
 
 export function Image({ element }: ImageProps) {
   const { src, alt = "", width, height } = element.props;
-  const { write } = useStdout();
   const [imageState, setImageState] = useState<ImageState | null>(null);
 
   useEffect(() => {
@@ -113,15 +112,16 @@ export function Image({ element }: ImageProps) {
     const inTmux = !!process.env.TMUX;
     const chunks = buildUploadSequence(base64Data, imageId, cols, rows);
 
-    // Upload image data to terminal via Ink's write() (escape sequences).
-    // The actual display happens via placeholder characters rendered by Ink below.
+    // Write upload sequences directly to stdout fd, bypassing Ink's stream layer.
+    // Ink intercepts process.stdout.write() and mangles escape sequences,
+    // but fs.writeSync to the raw fd passes bytes through unmodified.
     for (const chunk of chunks) {
       const output = inTmux ? wrapTmuxPassthrough(chunk) : chunk;
-      write(output);
+      fs.writeSync(process.stdout.fd, output);
     }
 
     setImageState({ imageId, rows, cols });
-  }, [src, width, height, write, imageState]);
+  }, [src, width, height, imageState]);
 
   if (!src) {
     return (
