@@ -1,7 +1,15 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import {
+  registerJsonRenderTool,
+  registerJsonRenderResource,
+} from "@json-render/mcp";
+import { buildAppHtml } from "@json-render/mcp/build-app-html";
+import fs from "node:fs";
 import { z } from "zod";
+import { catalog } from "./catalog.js";
 import { createIPCServer, type RenderMessage, type AddSeriesMessage } from "./ipc.js";
+import { createBrowserServer } from "./browser-server.js";
 import { ensurePane, closePane } from "./tmux-manager.js";
 
 type ToolResult = { content: { type: "text"; text: string }[]; isError?: boolean };
@@ -161,8 +169,103 @@ server.tool(
   }
 );
 
+// -- Browser rendering tools --
+
+let browser: ReturnType<typeof createBrowserServer> | null = null;
+
+function getBrowser() {
+  if (!browser) {
+    browser = createBrowserServer();
+  }
+  return browser;
+}
+
+async function waitForBrowserClient(browser: ReturnType<typeof createBrowserServer>, timeoutMs = 15000): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (browser.hasClients()) return true;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  return browser.hasClients();
+}
+
+server.tool(
+  "render_browser",
+  "Render a json-render spec in a browser page at localhost:3456. Use this when not running in a tmux session. Opens charts, tables, and dashboards in a local browser window.",
+  {
+    spec: z.object({
+      root: z.string().describe("ID of the root element"),
+      elements: z
+        .record(z.string(), z.unknown())
+        .describe("Map of element IDs to element definitions"),
+    }),
+    state: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe("Dynamic state values referenced by $state in the spec"),
+    title: z.string().optional().describe("Title for the visualization"),
+    mode: z
+      .enum(["replace", "append", "clear"])
+      .optional()
+      .describe("replace (default): replace current content. append: add below existing. clear: remove all content."),
+    chartId: z
+      .string()
+      .optional()
+      .describe("Optional ID for the chart, used to target it with add_series later."),
+  },
+  async ({ spec, state, title, mode, chartId }) => {
+    try {
+      const srv = getBrowser();
+      const url = await srv.start();
+
+      const message: RenderMessage = {
+        type: "render",
+        spec,
+        mode: mode ?? "replace",
+        ...(state && { state }),
+        ...(chartId && { chartId }),
+      };
+
+      if (!srv.hasClients()) {
+        // Auto-open browser on first render
+        const { exec } = await import("node:child_process");
+        exec(`open "${url}" 2>/dev/null || xdg-open "${url}" 2>/dev/null || true`);
+
+        if (!(await waitForBrowserClient(srv))) {
+          // Still send the spec — client may connect later
+          srv.sendSpec(message);
+          return ok(`Browser opened at ${url}. Waiting for connection — refresh if needed.`);
+        }
+      }
+
+      if (!srv.sendSpec(message)) {
+        return err("No browser connected. Open " + url + " in your browser.");
+      }
+
+      return ok(`Rendered in browser${title ? `: ${title}` : ""} at ${url}`);
+    } catch (error) {
+      return err(`Error: ${toErrorMessage(error)}`);
+    }
+  }
+);
+
+server.tool(
+  "close_browser",
+  "Stop the browser rendering server.",
+  async () => {
+    try {
+      browser?.close();
+      browser = null;
+      return ok("Browser server stopped.");
+    } catch (error) {
+      return err(`Error: ${toErrorMessage(error)}`);
+    }
+  }
+);
+
 async function cleanup() {
   ipc?.close();
+  browser?.close();
   await closePane();
   process.exit(0);
 }
@@ -170,7 +273,36 @@ async function cleanup() {
 process.on("SIGINT", cleanup);
 process.on("SIGTERM", cleanup);
 
+async function registerMcpApp() {
+  const resourceUri = "ui://splash/view.html";
+
+  try {
+    const appJsPath = new URL("./app.global.js", import.meta.url);
+    const appJs = fs.readFileSync(appJsPath, "utf-8");
+    const html = buildAppHtml({
+      title: "Splash",
+      js: appJs,
+      css: `body { margin: 0; background: #111827; color: #e5e7eb; font-family: monospace; }`,
+    });
+
+    await registerJsonRenderTool(server, {
+      catalog,
+      name: "render-ui",
+      title: "Render UI",
+      description:
+        "Render an interactive data visualization in the MCP client UI. Use this when not running in a tmux terminal.",
+      resourceUri,
+    });
+
+    await registerJsonRenderResource(server, { resourceUri, html });
+    console.error("splash: registered MCP Apps render-ui tool");
+  } catch (error) {
+    console.error("splash: MCP Apps registration skipped (app bundle not found):", toErrorMessage(error));
+  }
+}
+
 async function main() {
+  await registerMcpApp();
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("splash MCP server running on stdio");

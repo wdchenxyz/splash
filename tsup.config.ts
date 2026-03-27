@@ -18,4 +18,14 @@ export default defineConfig([
     outDir: "dist",
     banner: { js: "#!/usr/bin/env node" },
   },
+  {
+    entry: { app: "src/app/index.tsx" },
+    format: "iife",
+    target: "es2020",
+    platform: "browser",
+    outDir: "dist",
+    bundle: true,
+    minify: true,
+    noExternal: [/.*/],
+  },
 ]);

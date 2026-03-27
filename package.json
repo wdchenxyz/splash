@@ -13,18 +13,26 @@
   "dependencies": {
     "@json-render/core": "0.15.0",
     "@json-render/ink": "0.15.0",
+    "@json-render/mcp": "^0.15.0",
+    "@json-render/react": "^0.15.0",
     "@modelcontextprotocol/sdk": "^1.28.0",
     "ink": "^6.0.0",
     "react": "^19.0.0",
+    "react-dom": "^19.2.4",
+    "ws": "^8.20.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.2.3",
+    "@types/ws": "^8.18.1",
     "tsup": "^8.4.0",
     "typescript": "^5.7.0"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }
