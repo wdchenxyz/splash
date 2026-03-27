@@ -1,10 +1,20 @@
 import http from "node:http";
 import fs from "node:fs";
+import path from "node:path";
 import { WebSocketServer, WebSocket } from "ws";
 import type { SpecMessage } from "./ipc.js";
 
 const DEFAULT_PORT = 3456;
 const MAX_PORT_RETRIES = 10;
+
+const IMAGE_MIME: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".svg": "image/svg+xml",
+};
 
 export function createBrowserServer(port = DEFAULT_PORT) {
   let server: http.Server | null = null;
@@ -116,6 +126,45 @@ export function createBrowserServer(port = DEFAULT_PORT) {
           "Cache-Control": "no-cache",
         });
         res.end(appJs);
+      } else if (req.url?.startsWith("/files/")) {
+        const encoded = req.url.slice("/files/".length);
+        let filePath: string;
+        try {
+          filePath = Buffer.from(encoded, "base64url").toString("utf-8");
+        } catch {
+          res.writeHead(400, { "Content-Type": "text/plain" });
+          res.end("Bad request");
+          return;
+        }
+
+        if (!path.isAbsolute(filePath)) {
+          res.writeHead(403, { "Content-Type": "text/plain" });
+          res.end("Forbidden");
+          return;
+        }
+
+        const ext = path.extname(filePath).toLowerCase();
+        const mime = IMAGE_MIME[ext];
+        if (!mime) {
+          res.writeHead(403, { "Content-Type": "text/plain" });
+          res.end("Forbidden: not an image type");
+          return;
+        }
+
+        let data: Buffer;
+        try {
+          data = fs.readFileSync(filePath);
+        } catch {
+          res.writeHead(404, { "Content-Type": "text/plain" });
+          res.end("Not found");
+          return;
+        }
+
+        res.writeHead(200, {
+          "Content-Type": mime,
+          "Cache-Control": "no-cache",
+        });
+        res.end(data);
       } else {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         res.end(html);
@@ -166,5 +215,9 @@ export function createBrowserServer(port = DEFAULT_PORT) {
     boundPort = null;
   }
 
-  return { start, sendSpec, hasClients, close };
+  function getPort(): number | null {
+    return boundPort;
+  }
+
+  return { start, sendSpec, hasClients, close, getPort };
 }
