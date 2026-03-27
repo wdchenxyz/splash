@@ -43,14 +43,18 @@ function wrapTmuxPassthrough(kittySequences: string): string {
 }
 
 interface ImageProps {
-  props: Record<string, unknown>;
+  element: {
+    props: {
+      src?: string;
+      alt?: string;
+      width?: number;
+      height?: number;
+    };
+  };
 }
 
-export function Image({ props }: ImageProps) {
-  const src = props.src as string | undefined;
-  const alt = (props.alt as string) ?? "";
-  const width = props.width as number | undefined;
-  const height = props.height as number | undefined;
+export function Image({ element }: ImageProps) {
+  const { src, alt = "", width, height } = element.props;
 
   if (!src) {
     return (
