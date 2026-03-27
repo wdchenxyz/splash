@@ -4,17 +4,16 @@ import fs from "node:fs";
 
 const CHUNK_SIZE = 4096;
 
-function buildKittySequence(base64Data: string, cols?: number, rows?: number): string {
-  const chunks: string[] = [];
+function buildKittyChunks(base64Data: string, cols?: number, rows?: number): string[] {
+  const rawChunks: string[] = [];
   for (let i = 0; i < base64Data.length; i += CHUNK_SIZE) {
-    chunks.push(base64Data.slice(i, i + CHUNK_SIZE));
+    rawChunks.push(base64Data.slice(i, i + CHUNK_SIZE));
   }
 
-  const parts: string[] = [];
-
-  for (let idx = 0; idx < chunks.length; idx++) {
+  const sequences: string[] = [];
+  for (let idx = 0; idx < rawChunks.length; idx++) {
     const isFirst = idx === 0;
-    const isLast = idx === chunks.length - 1;
+    const isLast = idx === rawChunks.length - 1;
 
     const controlParts: string[] = [];
     if (isFirst) {
@@ -25,21 +24,27 @@ function buildKittySequence(base64Data: string, cols?: number, rows?: number): s
     controlParts.push(`m=${isLast ? 0 : 1}`);
 
     const control = controlParts.join(",");
-    parts.push(`\x1b_G${control};${chunks[idx]}\x1b\\`);
+    sequences.push(`\x1b_G${control};${rawChunks[idx]}\x1b\\`);
   }
 
-  return parts.join("");
+  return sequences;
 }
 
-function wrapTmuxPassthrough(kittySequences: string): string {
-  const seqs = kittySequences.split(/(?=\x1b_G)/);
-  return seqs
-    .filter((s) => s.length > 0)
-    .map((seq) => {
-      const doubled = seq.replace(/\x1b/g, "\x1b\x1b");
-      return `\x1bPtmux;${doubled}\x1b\\`;
-    })
-    .join("");
+function wrapTmuxPassthrough(seq: string): string {
+  const doubled = seq.replace(/\x1b/g, "\x1b\x1b");
+  return `\x1bPtmux;${doubled}\x1b\\`;
+}
+
+function writeToTTY(data: string): void {
+  // Open /dev/tty directly to bypass Ink's stdout interception.
+  // Ink takes over process.stdout for its rendering pipeline,
+  // so any escape sequences written there get corrupted.
+  const fd = fs.openSync("/dev/tty", "w");
+  try {
+    fs.writeSync(fd, data);
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
 interface ImageProps {
@@ -68,12 +73,15 @@ export function Image({ element }: ImageProps) {
       return;
     }
 
-    const kittyOutput = buildKittySequence(base64Data, width, height);
     const inTmux = !!process.env.TMUX;
-    const output = inTmux ? wrapTmuxPassthrough(kittyOutput) : kittyOutput;
+    const chunks = buildKittyChunks(base64Data, width, height);
 
-    // Write directly to stdout — Ink strips raw escape sequences
-    process.stdout.write(output);
+    // Write each chunk — wrap in tmux passthrough if inside tmux
+    for (const chunk of chunks) {
+      const output = inTmux ? wrapTmuxPassthrough(chunk) : chunk;
+      writeToTTY(output);
+    }
+    writeToTTY("\n");
     writtenRef.current = true;
   }, [src, width, height]);
 
@@ -85,7 +93,6 @@ export function Image({ element }: ImageProps) {
     );
   }
 
-  // Check if file exists for error display
   if (!fs.existsSync(src)) {
     return (
       <Box>
