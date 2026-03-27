@@ -69,6 +69,10 @@ export function createBrowserServer(port = DEFAULT_PORT) {
       }
     });
 
+    // Listen first, then attach WebSocket — avoids WSS emitting
+    // unhandled EADDRINUSE errors during port retry
+    boundPort = await tryListen(server, port);
+
     wss = new WebSocketServer({ server });
     wss.on("connection", (ws) => {
       clients.add(ws);
@@ -77,7 +81,6 @@ export function createBrowserServer(port = DEFAULT_PORT) {
       ws.on("error", () => clients.delete(ws));
     });
 
-    boundPort = await tryListen(server, port);
     return `http://localhost:${boundPort}`;
   }
 
