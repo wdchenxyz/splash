@@ -20,3 +20,15 @@ export const ShadcnProgress: ComponentFn = ({ props, children }) => {
   };
   return shadcnComponents.Progress({ props: mapped, children });
 };
+
+// Table: Splash uses {header,key} columns + object rows; shadcn uses string[] columns + string[][] rows
+export const ShadcnTable: ComponentFn = ({ props, children }) => {
+  const cols = (props.columns as Array<{ header: string; key: string }>) ?? [];
+  const rows = (props.rows as Array<Record<string, string>>) ?? [];
+  const mapped = {
+    ...props,
+    columns: cols.map((c) => c.header),
+    rows: rows.map((row) => cols.map((c) => row[c.key] ?? "")),
+  };
+  return shadcnComponents.Table({ props: mapped, children });
+};
