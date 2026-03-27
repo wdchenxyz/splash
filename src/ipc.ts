@@ -1,7 +1,7 @@
 import net from "node:net";
 import fs from "node:fs";
 
-const SOCKET_PATH = "/tmp/splash.sock";
+const SOCKET_PATH = process.env.SPLASH_SOCKET ?? `/tmp/splash-${process.pid}.sock`;
 
 export interface SeriesData {
   data: number[];

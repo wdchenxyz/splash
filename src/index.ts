@@ -90,7 +90,7 @@ server.tool(
   async ({ spec, state, title, position, size, mode, chartId }) => {
     try {
       const ipcServer = await getIPC();
-      await ensurePane({ position, size });
+      await ensurePane({ position, size, socketPath: ipcServer.socketPath });
 
       if (!(await waitForClient(ipcServer))) {
         return err("Renderer failed to connect within timeout. Is the tmux pane running?");

@@ -26,7 +26,7 @@ async function paneExists(paneId: string): Promise<boolean> {
   }
 }
 
-export async function ensurePane(options: PaneOptions = {}): Promise<string> {
+export async function ensurePane(options: PaneOptions & { socketPath?: string } = {}): Promise<string> {
   if (!(await isTmux())) {
     throw new Error(
       "Not running inside tmux. Start Claude Code in a tmux session to use terminal rendering."
@@ -37,14 +37,15 @@ export async function ensurePane(options: PaneOptions = {}): Promise<string> {
     return managedPaneId;
   }
 
-  const { position = "right", size = 40 } = options;
+  const { position = "right", size = 40, socketPath } = options;
   const rendererPath = path.join(__dirname, "renderer.js");
   const splitFlag = position === "right" ? "-h" : "-v";
+  const envPrefix = socketPath ? `SPLASH_SOCKET=${socketPath} ` : "";
 
   const { stdout } = await exec("tmux", [
     "split-window", "-d", splitFlag, "-p", String(size),
     "-P", "-F", "#{pane_id}",
-    `node ${rendererPath}`,
+    `${envPrefix}node ${rendererPath}`,
   ]);
 
   managedPaneId = stdout.trim();

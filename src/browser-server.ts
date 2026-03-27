@@ -4,10 +4,12 @@ import { WebSocketServer, WebSocket } from "ws";
 import type { SpecMessage } from "./ipc.js";
 
 const DEFAULT_PORT = 3456;
+const MAX_PORT_RETRIES = 10;
 
 export function createBrowserServer(port = DEFAULT_PORT) {
   let server: http.Server | null = null;
   let wss: WebSocketServer | null = null;
+  let boundPort: number | null = null;
   const clients = new Set<WebSocket>();
   let appJs: string | null = null;
   let lastMessage: string | null = null;
@@ -36,10 +38,22 @@ export function createBrowserServer(port = DEFAULT_PORT) {
 </body>
 </html>`;
 
-  async function start(): Promise<string> {
-    if (server) return `http://localhost:${port}`;
+  function tryListen(srv: http.Server, p: number): Promise<number> {
+    return new Promise((resolve, reject) => {
+      srv.once("error", (err: NodeJS.ErrnoException) => {
+        if (err.code === "EADDRINUSE" && p - port < MAX_PORT_RETRIES) {
+          resolve(tryListen(srv, p + 1));
+        } else {
+          reject(err);
+        }
+      });
+      srv.listen(p, () => resolve(p));
+    });
+  }
 
-    // Pre-load the JS bundle
+  async function start(): Promise<string> {
+    if (server && boundPort) return `http://localhost:${boundPort}`;
+
     loadAppJs();
 
     server = http.createServer((req, res) => {
@@ -58,18 +72,13 @@ export function createBrowserServer(port = DEFAULT_PORT) {
     wss = new WebSocketServer({ server });
     wss.on("connection", (ws) => {
       clients.add(ws);
-      // Replay last spec so refreshes don't show blank page
       if (lastMessage) ws.send(lastMessage);
       ws.on("close", () => clients.delete(ws));
       ws.on("error", () => clients.delete(ws));
     });
 
-    return new Promise((resolve, reject) => {
-      server!.listen(port, () => {
-        resolve(`http://localhost:${port}`);
-      });
-      server!.on("error", reject);
-    });
+    boundPort = await tryListen(server, port);
+    return `http://localhost:${boundPort}`;
   }
 
   function sendSpec(message: SpecMessage): boolean {
@@ -98,6 +107,7 @@ export function createBrowserServer(port = DEFAULT_PORT) {
     server?.close();
     wss = null;
     server = null;
+    boundPort = null;
   }
 
   return { start, sendSpec, hasClients, close };
