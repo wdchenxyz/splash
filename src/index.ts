@@ -1,13 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  registerJsonRenderTool,
-  registerJsonRenderResource,
-} from "@json-render/mcp";
-import { buildAppHtml } from "@json-render/mcp/build-app-html";
-import fs from "node:fs";
 import { z } from "zod";
-import { catalog } from "./catalog.js";
 import { createIPCServer, type RenderMessage, type AddSeriesMessage } from "./ipc.js";
 import { createBrowserServer } from "./browser-server.js";
 import { ensurePane, closePane } from "./tmux-manager.js";
@@ -31,6 +24,32 @@ const server = new McpServer({
   version: "0.1.0",
 });
 
+// -- Shared spec schema --
+
+const specSchema = z.object({
+  root: z.string().describe("ID of the root element"),
+  elements: z
+    .record(z.string(), z.unknown())
+    .describe("Map of element IDs to element definitions"),
+});
+
+const stateSchema = z
+  .record(z.string(), z.unknown())
+  .optional()
+  .describe("Dynamic state values referenced by $state in the spec");
+
+const modeSchema = z
+  .enum(["replace", "append", "clear"])
+  .optional()
+  .describe("replace (default): replace current content. append: add below existing. clear: remove all content.");
+
+const chartIdSchema = z
+  .string()
+  .optional()
+  .describe("Optional ID for the chart, used to target it with add_series later.");
+
+// -- Tmux renderer --
+
 let ipc: ReturnType<typeof createIPCServer> | null = null;
 
 async function getIPC() {
@@ -51,19 +70,11 @@ async function waitForClient(ipc: ReturnType<typeof createIPCServer>, timeoutMs 
 }
 
 server.tool(
-  "render",
-  "Render a json-render spec in a tmux pane. Use this to display charts, tables, sparklines, and other data visualizations in the terminal.",
+  "render-tmux",
+  "Render a json-render spec in a tmux pane. Displays charts, tables, and dashboards in the terminal using braille/block characters.",
   {
-    spec: z.object({
-      root: z.string().describe("ID of the root element"),
-      elements: z
-        .record(z.string(), z.unknown())
-        .describe("Map of element IDs to element definitions"),
-    }),
-    state: z
-      .record(z.string(), z.unknown())
-      .optional()
-      .describe("Dynamic state values referenced by $state in the spec"),
+    spec: specSchema,
+    state: stateSchema,
     title: z.string().optional().describe("Title for the pane"),
     position: z
       .enum(["right", "bottom"])
@@ -73,14 +84,8 @@ server.tool(
       .number()
       .optional()
       .describe("Pane size as percentage (default: 40)"),
-    mode: z
-      .enum(["replace", "append", "clear"])
-      .optional()
-      .describe("replace (default): replace current content. append: add below existing. clear: remove all content."),
-    chartId: z
-      .string()
-      .optional()
-      .describe("Optional ID for the chart, used to target it with add_series later."),
+    mode: modeSchema,
+    chartId: chartIdSchema,
   },
   async ({ spec, state, title, position, size, mode, chartId }) => {
     try {
@@ -111,8 +116,101 @@ server.tool(
 );
 
 server.tool(
-  "add_series",
-  "Add a data series to an existing LineChart in the render pane. No need to resend existing data.",
+  "close-tmux",
+  "Close the tmux rendering pane.",
+  async () => {
+    try {
+      await closePane();
+      return ok("Render pane closed.");
+    } catch (error) {
+      return err(`Error closing pane: ${toErrorMessage(error)}`);
+    }
+  }
+);
+
+// -- Browser renderer --
+
+let browser: ReturnType<typeof createBrowserServer> | null = null;
+
+function getBrowser() {
+  if (!browser) {
+    browser = createBrowserServer();
+  }
+  return browser;
+}
+
+async function waitForBrowserClient(srv: ReturnType<typeof createBrowserServer>, timeoutMs = 15000): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (srv.hasClients()) return true;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  return srv.hasClients();
+}
+
+server.tool(
+  "render-browser",
+  "Render a json-render spec in a browser page at localhost:3456. Opens charts, tables, and dashboards with SVG rendering in a local browser window.",
+  {
+    spec: specSchema,
+    state: stateSchema,
+    title: z.string().optional().describe("Title for the visualization"),
+    mode: modeSchema,
+    chartId: chartIdSchema,
+  },
+  async ({ spec, state, title, mode, chartId }) => {
+    try {
+      const srv = getBrowser();
+      const url = await srv.start();
+
+      const message: RenderMessage = {
+        type: "render",
+        spec,
+        mode: mode ?? "replace",
+        ...(state && { state }),
+        ...(chartId && { chartId }),
+      };
+
+      if (!srv.hasClients()) {
+        const { exec } = await import("node:child_process");
+        exec(`open "${url}" 2>/dev/null || xdg-open "${url}" 2>/dev/null || true`);
+
+        if (!(await waitForBrowserClient(srv))) {
+          srv.sendSpec(message);
+          return ok(`Browser opened at ${url}. Waiting for connection — refresh if needed.`);
+        }
+      }
+
+      if (!srv.sendSpec(message)) {
+        return err("No browser connected. Open " + url + " in your browser.");
+      }
+
+      return ok(`Rendered in browser${title ? `: ${title}` : ""} at ${url}`);
+    } catch (error) {
+      return err(`Error: ${toErrorMessage(error)}`);
+    }
+  }
+);
+
+server.tool(
+  "close-browser",
+  "Stop the browser rendering server.",
+  async () => {
+    try {
+      browser?.close();
+      browser = null;
+      return ok("Browser server stopped.");
+    } catch (error) {
+      return err(`Error: ${toErrorMessage(error)}`);
+    }
+  }
+);
+
+// -- Shared tools --
+
+server.tool(
+  "add-series",
+  "Add a data series to an existing LineChart. Broadcasts to all active renderers (tmux and browser).",
   {
     chartId: z
       .string()
@@ -133,20 +231,24 @@ server.tool(
   },
   async ({ chartId, data, label, color, fill }) => {
     try {
-      const ipcServer = await getIPC();
-
-      if (!ipcServer.hasClients()) {
-        return err("No renderer connected. Render a chart first.");
-      }
-
       const message: AddSeriesMessage = {
         type: "add_series",
         chartId,
         series: { data, label, color, fill },
       };
 
-      if (!ipcServer.sendSpec(message)) {
-        return err("Failed to send to renderer.");
+      let sent = false;
+
+      if (ipc?.hasClients()) {
+        sent = ipc.sendSpec(message) || sent;
+      }
+
+      if (browser?.hasClients()) {
+        sent = browser.sendSpec(message) || sent;
+      }
+
+      if (!sent) {
+        return err("No renderer connected. Render a chart first.");
       }
 
       return ok(`Added series${label ? ` "${label}"` : ""} to chart${chartId ? ` "${chartId}"` : ""}.`);
@@ -156,112 +258,7 @@ server.tool(
   }
 );
 
-server.tool(
-  "close_render",
-  "Close the terminal rendering pane.",
-  async () => {
-    try {
-      await closePane();
-      return ok("Render pane closed.");
-    } catch (error) {
-      return err(`Error closing pane: ${toErrorMessage(error)}`);
-    }
-  }
-);
-
-// -- Browser rendering tools --
-
-let browser: ReturnType<typeof createBrowserServer> | null = null;
-
-function getBrowser() {
-  if (!browser) {
-    browser = createBrowserServer();
-  }
-  return browser;
-}
-
-async function waitForBrowserClient(browser: ReturnType<typeof createBrowserServer>, timeoutMs = 15000): Promise<boolean> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    if (browser.hasClients()) return true;
-    await new Promise((r) => setTimeout(r, 200));
-  }
-  return browser.hasClients();
-}
-
-server.tool(
-  "render_browser",
-  "Render a json-render spec in a browser page at localhost:3456. Use this when not running in a tmux session. Opens charts, tables, and dashboards in a local browser window.",
-  {
-    spec: z.object({
-      root: z.string().describe("ID of the root element"),
-      elements: z
-        .record(z.string(), z.unknown())
-        .describe("Map of element IDs to element definitions"),
-    }),
-    state: z
-      .record(z.string(), z.unknown())
-      .optional()
-      .describe("Dynamic state values referenced by $state in the spec"),
-    title: z.string().optional().describe("Title for the visualization"),
-    mode: z
-      .enum(["replace", "append", "clear"])
-      .optional()
-      .describe("replace (default): replace current content. append: add below existing. clear: remove all content."),
-    chartId: z
-      .string()
-      .optional()
-      .describe("Optional ID for the chart, used to target it with add_series later."),
-  },
-  async ({ spec, state, title, mode, chartId }) => {
-    try {
-      const srv = getBrowser();
-      const url = await srv.start();
-
-      const message: RenderMessage = {
-        type: "render",
-        spec,
-        mode: mode ?? "replace",
-        ...(state && { state }),
-        ...(chartId && { chartId }),
-      };
-
-      if (!srv.hasClients()) {
-        // Auto-open browser on first render
-        const { exec } = await import("node:child_process");
-        exec(`open "${url}" 2>/dev/null || xdg-open "${url}" 2>/dev/null || true`);
-
-        if (!(await waitForBrowserClient(srv))) {
-          // Still send the spec — client may connect later
-          srv.sendSpec(message);
-          return ok(`Browser opened at ${url}. Waiting for connection — refresh if needed.`);
-        }
-      }
-
-      if (!srv.sendSpec(message)) {
-        return err("No browser connected. Open " + url + " in your browser.");
-      }
-
-      return ok(`Rendered in browser${title ? `: ${title}` : ""} at ${url}`);
-    } catch (error) {
-      return err(`Error: ${toErrorMessage(error)}`);
-    }
-  }
-);
-
-server.tool(
-  "close_browser",
-  "Stop the browser rendering server.",
-  async () => {
-    try {
-      browser?.close();
-      browser = null;
-      return ok("Browser server stopped.");
-    } catch (error) {
-      return err(`Error: ${toErrorMessage(error)}`);
-    }
-  }
-);
+// -- Lifecycle --
 
 async function cleanup() {
   ipc?.close();
@@ -273,36 +270,7 @@ async function cleanup() {
 process.on("SIGINT", cleanup);
 process.on("SIGTERM", cleanup);
 
-async function registerMcpApp() {
-  const resourceUri = "ui://splash/view.html";
-
-  try {
-    const appJsPath = new URL("./app.global.js", import.meta.url);
-    const appJs = fs.readFileSync(appJsPath, "utf-8");
-    const html = buildAppHtml({
-      title: "Splash",
-      js: appJs,
-      css: `body { margin: 0; background: #111827; color: #e5e7eb; font-family: monospace; }`,
-    });
-
-    await registerJsonRenderTool(server, {
-      catalog,
-      name: "render-ui",
-      title: "Render UI",
-      description:
-        "Render an interactive data visualization in the MCP client UI. Use this when not running in a tmux terminal.",
-      resourceUri,
-    });
-
-    await registerJsonRenderResource(server, { resourceUri, html });
-    console.error("splash: registered MCP Apps render-ui tool");
-  } catch (error) {
-    console.error("splash: MCP Apps registration skipped (app bundle not found):", toErrorMessage(error));
-  }
-}
-
 async function main() {
-  await registerMcpApp();
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("splash MCP server running on stdio");

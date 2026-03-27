@@ -124,14 +124,17 @@ export function LineChart({ props }: LineChartProps) {
         );
       })}
 
-      {seriesList.length > 1 && (
-        <g>
-          {seriesList
-            .filter((s) => s.label)
-            .map((s, i) => {
+      {seriesList.length > 1 && (() => {
+        const labeled = seriesList.filter((s) => s.label);
+        let xOffset = padding.left;
+        return (
+          <g>
+            {labeled.map((s, i) => {
               const color = s.color ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length];
+              const x = xOffset;
+              xOffset += 20 + (s.label?.length ?? 0) * 6 + 16;
               return (
-                <g key={i} transform={`translate(${padding.left + i * 80}, ${svgHeight - 6})`}>
+                <g key={i} transform={`translate(${x}, ${svgHeight - 6})`}>
                   <line x1={0} y1={-4} x2={12} y2={-4} stroke={color} strokeWidth={2} />
                   <text x={16} y={0} fontSize="9" fill="#9ca3af">
                     {s.label}
@@ -139,8 +142,9 @@ export function LineChart({ props }: LineChartProps) {
                 </g>
               );
             })}
-        </g>
-      )}
+          </g>
+        );
+      })()}
     </svg>
   );
 }
