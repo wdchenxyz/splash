@@ -29,6 +29,7 @@ const components: Record<string, (p: { props: Record<string, unknown>; children?
   Card: shadcnComponents.Card,
   Heading: shadcnComponents.Heading,
   Spinner: shadcnComponents.Spinner,
+  Image: shadcnComponents.Image,
   Table: ShadcnTable,
   Badge: ShadcnBadge,
   ProgressBar: ShadcnProgress,
