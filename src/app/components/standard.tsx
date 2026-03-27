@@ -112,13 +112,14 @@ export function Markdown({ props }: { props: Record<string, unknown> }) {
   return <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", lineHeight: 1.5 }}>{props.text as string}</pre>;
 }
 
-export function Callout({ props }: { props: Record<string, unknown> }) {
+export function Callout({ props, children }: { props: Record<string, unknown>; children?: ReactNode }) {
   const colors: Record<string, string> = { info: "#1e3a5f", warning: "#78350f", tip: "#064e3b", important: "#4c1d95" };
   const bg = colors[(props.type as string) ?? "info"] ?? colors.info;
   return (
     <div style={{ backgroundColor: bg, borderRadius: 6, padding: 12 }}>
       {props.title && <div style={{ fontWeight: "bold", marginBottom: 4 }}>{props.title as string}</div>}
-      <div>{props.content as string}</div>
+      {props.content && <div>{props.content as string}</div>}
+      {children}
     </div>
   );
 }
