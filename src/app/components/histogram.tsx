@@ -51,15 +51,15 @@ export function Histogram({ props }: HistogramProps) {
   for (const v of data) sqDiffSum += (v - mean) ** 2;
   const stddev = Math.sqrt(sqDiffSum / n);
 
-  const padding = { top: 24, right: 12, bottom: 32, left: 64 };
+  const padding = { top: 28, right: 12, bottom: 36, left: 120 };
   const plotW = svgWidth - padding.left - padding.right;
   const barH = Math.max(12, (svgHeight - padding.top - padding.bottom) / binCount - 2);
   const totalH = padding.top + binCount * (barH + 2) + padding.bottom;
 
   return (
-    <svg viewBox={`0 0 ${svgWidth} ${totalH}`} style={{ width: "100%", fontFamily: "monospace" }}>
+    <svg viewBox={`0 0 ${svgWidth} ${totalH}`} style={{ width: "100%", maxWidth: svgWidth, fontFamily: "monospace" }}>
       {p.label && (
-        <text x={svgWidth / 2} y={16} textAnchor="middle" fontSize="12" fontWeight="bold" fill="#e5e7eb">
+        <text x={svgWidth / 2} y={16} textAnchor="middle" fontSize="16" fontWeight="bold" fill="#e5e7eb">
           {p.label}
         </text>
       )}
@@ -73,12 +73,12 @@ export function Histogram({ props }: HistogramProps) {
 
         return (
           <g key={i}>
-            <text x={padding.left - 4} y={y + barH / 2 + 4} textAnchor="end" fontSize="9" fill="#9ca3af">
+            <text x={padding.left - 4} y={y + barH / 2 + 4} textAnchor="end" fontSize="14" fill="#9ca3af">
               {label}
             </text>
             <rect x={padding.left} y={y} width={w} height={barH} fill={color} rx={2} />
             {showValues && count > 0 && (
-              <text x={padding.left + w + 4} y={y + barH / 2 + 4} fontSize="9" fill="#9ca3af">
+              <text x={padding.left + w + 4} y={y + barH / 2 + 4} fontSize="14" fill="#9ca3af">
                 {count}
               </text>
             )}
@@ -86,7 +86,7 @@ export function Histogram({ props }: HistogramProps) {
         );
       })}
 
-      <text x={svgWidth / 2} y={totalH - 8} textAnchor="middle" fontSize="9" fill="#6b7280">
+      <text x={svgWidth / 2} y={totalH - 8} textAnchor="middle" fontSize="14" fill="#6b7280">
         n={n} {"\u03BC"}={fmt(mean)} {"\u03C3"}={fmt(stddev)}
       </text>
     </svg>

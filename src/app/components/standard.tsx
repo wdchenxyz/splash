@@ -7,10 +7,11 @@ export function Box({ props, children }: { props: Record<string, unknown>; child
   const style: CSSProperties = {
     display: "flex",
     flexDirection: dir as CSSProperties["flexDirection"],
-    alignItems: (props.alignItems as CSSProperties["alignItems"]) ?? (dir === "row" ? "flex-start" : undefined),
+    alignItems: (props.alignItems as CSSProperties["alignItems"]) ?? (dir === "row" ? "center" : undefined),
     justifyContent: (props.justifyContent as CSSProperties["justifyContent"]) ?? undefined,
     flexGrow: (props.flexGrow as number) ?? 1,
-    flexShrink: (props.flexShrink as number) ?? undefined,
+    flexShrink: (props.flexShrink as number) ?? 1,
+    minWidth: 0,
     flexWrap: (props.flexWrap as CSSProperties["flexWrap"]) ?? undefined,
     gap: props.gap != null ? (props.gap as number) * 8 : undefined,
     padding: props.padding != null ? (props.padding as number) * 8 : undefined,
@@ -194,7 +195,7 @@ export function Sparkline({ props }: { props: Record<string, unknown> }) {
   return (
     <div>
       {props.label && <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 2 }}>{props.label as string}</div>}
-      <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", height }}>
+      <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", maxWidth: width, height }}>
         <polyline points={points} fill="none" stroke={color} strokeWidth={1.5} />
       </svg>
     </div>
@@ -212,7 +213,7 @@ export function BarChart({ props }: { props: Record<string, unknown> }) {
   const total = data.reduce((s, d) => s + d.value, 0);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1, width: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1, width: "100%", maxWidth: barWidth }}>
       {data.map((d, i) => {
         const pct = maxVal > 0 ? (d.value / maxVal) * 100 : 0;
         return (

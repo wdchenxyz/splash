@@ -47,16 +47,16 @@ export function Heatmap({ props }: HeatmapProps) {
   }
   const range = max - min || 1;
 
-  const padding = { top: p.label ? 24 : 8, left: p.yLabels ? 60 : 8, bottom: p.xLabels ? 24 : 8, right: 8 };
+  const padding = { top: p.label ? 28 : 8, left: p.yLabels ? 76 : 8, bottom: p.xLabels ? 28 : 8, right: 8 };
   const svgWidth = padding.left + cols * cellSize + padding.right;
   const svgHeight = padding.top + data.length * cellSize + padding.bottom + 24;
 
   const fmtVal = (v: number) => (range < 1 ? v.toFixed(2) : range < 10 ? v.toFixed(1) : Math.round(v).toString());
 
   return (
-    <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ width: "100%", fontFamily: "monospace" }}>
+    <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ width: "100%", maxWidth: svgWidth, fontFamily: "monospace" }}>
       {p.label && (
-        <text x={svgWidth / 2} y={16} textAnchor="middle" fontSize="12" fontWeight="bold" fill="#e5e7eb">
+        <text x={svgWidth / 2} y={16} textAnchor="middle" fontSize="16" fontWeight="bold" fill="#e5e7eb">
           {p.label}
         </text>
       )}
@@ -64,7 +64,7 @@ export function Heatmap({ props }: HeatmapProps) {
       {data.map((row, ri) => (
         <g key={ri}>
           {p.yLabels?.[ri] && (
-            <text x={padding.left - 4} y={padding.top + ri * cellSize + cellSize / 2 + 4} textAnchor="end" fontSize="9" fill="#9ca3af">
+            <text x={padding.left - 4} y={padding.top + ri * cellSize + cellSize / 2 + 4} textAnchor="end" fontSize="14" fill="#9ca3af">
               {p.yLabels[ri]}
             </text>
           )}
@@ -81,7 +81,7 @@ export function Heatmap({ props }: HeatmapProps) {
                     x={x + cellSize / 2}
                     y={y + cellSize / 2 + 4}
                     textAnchor="middle"
-                    fontSize="9"
+                    fontSize="14"
                     fill={norm > 0.5 ? "#000" : "#fff"}
                   >
                     {fmtVal(val)}
@@ -100,7 +100,7 @@ export function Heatmap({ props }: HeatmapProps) {
             x={padding.left + i * cellSize + cellSize / 2}
             y={padding.top + data.length * cellSize + 14}
             textAnchor="middle"
-            fontSize="9"
+            fontSize="14"
             fill="#9ca3af"
           >
             {label}
@@ -109,13 +109,13 @@ export function Heatmap({ props }: HeatmapProps) {
 
       {/* Legend */}
       <g transform={`translate(${padding.left}, ${svgHeight - 18})`}>
-        <text x={-4} y={10} textAnchor="end" fontSize="9" fill="#9ca3af">
+        <text x={-4} y={10} textAnchor="end" fontSize="14" fill="#9ca3af">
           {fmtVal(min)}
         </text>
         {gradient.map((c, i) => (
           <rect key={i} x={i * 16} y={0} width={16} height={12} fill={c} />
         ))}
-        <text x={gradient.length * 16 + 4} y={10} fontSize="9" fill="#9ca3af">
+        <text x={gradient.length * 16 + 4} y={10} fontSize="14" fill="#9ca3af">
           {fmtVal(max)}
         </text>
       </g>

@@ -17,6 +17,7 @@ interface LineChartProps {
     color?: string | null;
     showAxis?: boolean | null;
     fill?: boolean | null;
+    xLabels?: string[] | null;
   };
 }
 
@@ -40,7 +41,10 @@ export function LineChart({ props }: LineChartProps) {
   const svgWidth = (p.width ?? 60) * 8;
   const svgHeight = (p.height ?? 12) * 16;
   const showAxis = p.showAxis !== false;
-  const padding = { top: 20, right: 12, bottom: 24, left: showAxis ? 48 : 12 };
+  const hasXLabels = p.xLabels && p.xLabels.length > 0;
+  const hasLegend = (p.series?.length ?? 0) > 1;
+  const bottomPad = hasXLabels && hasLegend ? 58 : hasXLabels ? 44 : hasLegend ? 40 : 28;
+  const padding = { top: 24, right: hasXLabels ? 30 : 12, bottom: bottomPad, left: showAxis ? 60 : 12 };
   const plotW = svgWidth - padding.left - padding.right;
   const plotH = svgHeight - padding.top - padding.bottom;
 
@@ -93,9 +97,9 @@ export function LineChart({ props }: LineChartProps) {
   const tickCount = 5;
 
   return (
-    <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ width: "100%", fontFamily: "monospace" }}>
+    <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ width: "100%", maxWidth: svgWidth, fontFamily: "monospace" }}>
       {p.label && (
-        <text x={svgWidth / 2} y={14} textAnchor="middle" fontSize="12" fontWeight="bold" fill="#e5e7eb">
+        <text x={svgWidth / 2} y={14} textAnchor="middle" fontSize="16" fontWeight="bold" fill="#e5e7eb">
           {p.label}
         </text>
       )}
@@ -107,7 +111,7 @@ export function LineChart({ props }: LineChartProps) {
           return (
             <g key={i}>
               <line x1={padding.left} y1={y} x2={padding.left + plotW} y2={y} stroke="#374151" strokeWidth={0.5} />
-              <text x={padding.left - 4} y={y + 4} textAnchor="end" fontSize="9" fill="#9ca3af">
+              <text x={padding.left - 4} y={y + 4} textAnchor="end" fontSize="14" fill="#9ca3af">
                 {val.toFixed(yDecimals)}
               </text>
             </g>
@@ -124,6 +128,26 @@ export function LineChart({ props }: LineChartProps) {
         );
       })}
 
+      {hasXLabels &&
+        p.xLabels!.map((label, i) => {
+          const n = p.xLabels!.length;
+          const x = n === 1
+            ? padding.left + plotW / 2
+            : padding.left + (i / (n - 1)) * plotW;
+          return (
+            <text
+              key={`xlabel-${i}`}
+              x={x}
+              y={padding.top + plotH + 16}
+              textAnchor="middle"
+              fontSize="14"
+              fill="#9ca3af"
+            >
+              {label}
+            </text>
+          );
+        })}
+
       {seriesList.length > 1 && (() => {
         const labeled = seriesList.filter((s) => s.label);
         let xOffset = padding.left;
@@ -132,11 +156,11 @@ export function LineChart({ props }: LineChartProps) {
             {labeled.map((s, i) => {
               const color = s.color ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length];
               const x = xOffset;
-              xOffset += 20 + (s.label?.length ?? 0) * 6 + 16;
+              xOffset += 20 + (s.label?.length ?? 0) * 9 + 16;
               return (
                 <g key={i} transform={`translate(${x}, ${svgHeight - 6})`}>
                   <line x1={0} y1={-4} x2={12} y2={-4} stroke={color} strokeWidth={2} />
-                  <text x={16} y={0} fontSize="9" fill="#9ca3af">
+                  <text x={16} y={0} fontSize="14" fill="#9ca3af">
                     {s.label}
                   </text>
                 </g>

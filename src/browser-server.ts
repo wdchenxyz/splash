@@ -67,7 +67,7 @@ export function createBrowserServer(port = DEFAULT_PORT) {
     };
   </script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; min-width: 0; }
     body { background: #0a0e17; color: #e5e7eb; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
 
     /* shadcn dark theme CSS variables */

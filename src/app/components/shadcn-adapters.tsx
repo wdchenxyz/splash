@@ -30,5 +30,7 @@ export const ShadcnTable: ComponentFn = ({ props, children }) => {
     columns: cols.map((c) => c.header),
     rows: rows.map((row) => cols.map((c) => row[c.key] ?? "")),
   };
-  return shadcnComponents.Table({ props: mapped, children });
+  return React.createElement("div", { style: { maxWidth: 640 } },
+    shadcnComponents.Table({ props: mapped, children })
+  );
 };

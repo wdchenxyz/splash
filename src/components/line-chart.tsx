@@ -27,6 +27,7 @@ interface LineChartProps {
       color?: string;
       showAxis?: boolean;
       fill?: boolean;
+      xLabels?: string[];
     };
   };
 }
@@ -203,6 +204,39 @@ export function LineChart({ element }: LineChartProps) {
           {"└" + "─".repeat(chartWidth)}
         </Text>
       )}
+      {showAxis && p.xLabels && p.xLabels.length > 0 && (() => {
+        const labels = p.xLabels!;
+        const n = labels.length;
+        // Build a character buffer for the label row
+        const buf = new Array(chartWidth).fill(" ");
+
+        for (let i = 0; i < n; i++) {
+          // Position each label evenly across the chart width
+          const pos = n === 1 ? Math.floor(chartWidth / 2) : Math.round((i / (n - 1)) * (chartWidth - 1));
+          // Available space before the next label (or end of chart)
+          const nextPos = i < n - 1
+            ? Math.round(((i + 1) / (n - 1)) * (chartWidth - 1))
+            : chartWidth;
+          const maxLen = i < n - 1 ? nextPos - pos : labels[i].length;
+          const truncated = labels[i].slice(0, Math.max(1, maxLen));
+
+          // Center the label around its position; right-align the last label
+          const offset = i === n - 1 && n > 1
+            ? Math.max(0, chartWidth - truncated.length)
+            : Math.max(0, pos - Math.floor(truncated.length / 2));
+          for (let c = 0; c < truncated.length && offset + c < chartWidth; c++) {
+            if (buf[offset + c] === " ") {
+              buf[offset + c] = truncated[c];
+            }
+          }
+        }
+
+        return (
+          <Text dimColor>
+            {"".padStart(yLabelWidth + 2)}{buf.join("")}
+          </Text>
+        );
+      })()}
     </Box>
   );
 }
