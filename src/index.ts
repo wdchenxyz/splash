@@ -194,7 +194,7 @@ server.tool(
 
       if (!srv.hasClients()) {
         const { exec } = await import("node:child_process");
-        exec(`open "${url}" 2>/dev/null || xdg-open "${url}" 2>/dev/null || true`);
+        exec(`open -a "Google Chrome" "${url}" 2>/dev/null || open "${url}" 2>/dev/null || xdg-open "${url}" 2>/dev/null || true`);
 
         if (!(await waitForBrowserClient(srv))) {
           srv.sendSpec(message);

@@ -77,12 +77,13 @@ interface ImageProps {
       alt?: string;
       width?: number;
       height?: number;
+      background?: string;
     };
   };
 }
 
 export function Image({ element }: ImageProps) {
-  const { src, alt = "", width, height } = element.props;
+  const { src, alt = "", width, height, background } = element.props;
   const cols = width ?? 40;
   const rows = height ?? 15;
 
@@ -124,7 +125,7 @@ export function Image({ element }: ImageProps) {
 
   const hexColor = imageIdToHex(state.imageId);
 
-  return (
+  const content = (
     <Box flexDirection="column">
       {Array.from({ length: rows }, (_, r) => (
         <Text key={r} color={hexColor}>
@@ -134,4 +135,14 @@ export function Image({ element }: ImageProps) {
       {alt ? <Text color="gray">{alt}</Text> : null}
     </Box>
   );
+
+  if (background) {
+    return (
+      <Box flexDirection="column" backgroundColor={background}>
+        {content}
+      </Box>
+    );
+  }
+
+  return content;
 }

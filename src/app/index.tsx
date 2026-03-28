@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { shadcnComponents } from "@json-render/shadcn";
-import { ShadcnBadge, ShadcnProgress, ShadcnTable } from "./components/shadcn-adapters.js";
+import { ShadcnBadge, ShadcnImage, ShadcnProgress, ShadcnTable } from "./components/shadcn-adapters.js";
 import { LineChart } from "./components/line-chart.js";
 import { Histogram } from "./components/histogram.js";
 import { Heatmap } from "./components/heatmap.js";
@@ -29,7 +29,7 @@ const components: Record<string, (p: { props: Record<string, unknown>; children?
   Card: shadcnComponents.Card,
   Heading: shadcnComponents.Heading,
   Spinner: shadcnComponents.Spinner,
-  Image: shadcnComponents.Image,
+  Image: ShadcnImage,
   Table: ShadcnTable,
   Badge: ShadcnBadge,
   ProgressBar: ShadcnProgress,
