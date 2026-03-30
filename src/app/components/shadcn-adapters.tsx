@@ -41,12 +41,19 @@ export const ShadcnImage: ComponentFn = ({ props, children }) => {
 export const ShadcnTable: ComponentFn = ({ props, children }) => {
   const cols = (props.columns as Array<{ header: string; key: string }>) ?? [];
   const rows = (props.rows as Array<Record<string, string>>) ?? [];
+  const width = props.width as number | string | undefined;
+  const height = props.height as number | string | undefined;
   const mapped = {
     ...props,
     columns: cols.map((c) => c.header),
     rows: rows.map((row) => cols.map((c) => row[c.key] ?? "")),
   };
-  return React.createElement("div", { style: { maxWidth: 640 } },
+  const style: Record<string, unknown> = width ? { width } : { maxWidth: 640 };
+  if (height) {
+    style.maxHeight = height;
+    style.overflow = "auto";
+  }
+  return React.createElement("div", { style },
     shadcnComponents.Table({ props: mapped, children })
   );
 };
