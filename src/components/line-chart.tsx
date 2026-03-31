@@ -28,6 +28,7 @@ interface LineChartProps {
       showAxis?: boolean;
       fill?: boolean;
       xLabels?: string[];
+      maxXLabels?: number;
     };
   };
 }
@@ -205,20 +206,34 @@ export function LineChart({ element }: LineChartProps) {
         </Text>
       )}
       {showAxis && p.xLabels && p.xLabels.length > 0 && (() => {
-        const labels = p.xLabels!;
+        const allLabels = p.xLabels!;
+        const totalN = allLabels.length;
+        // Auto-thin: estimate how many labels fit based on max label width + gap
+        const maxLabelLen = Math.max(...allLabels.map((l) => l.length));
+        const fitCount = Math.max(2, Math.floor(chartWidth / (maxLabelLen + 1)));
+        const maxLabels = p.maxXLabels ? Math.min(p.maxXLabels, totalN) : Math.min(fitCount, totalN);
+        // Always include first and last; evenly sample the rest
+        const step = totalN <= maxLabels ? 1 : (totalN - 1) / (maxLabels - 1);
+        const indices = totalN <= maxLabels
+          ? Array.from({ length: totalN }, (_, i) => i)
+          : Array.from({ length: maxLabels }, (_, i) =>
+              i === maxLabels - 1 ? totalN - 1 : Math.round(i * step)
+            );
+
+        const labels = indices.map((idx) => ({ text: allLabels[idx], origIdx: idx }));
         const n = labels.length;
         // Build a character buffer for the label row
         const buf = new Array(chartWidth).fill(" ");
 
         for (let i = 0; i < n; i++) {
-          // Position each label evenly across the chart width
-          const pos = n === 1 ? Math.floor(chartWidth / 2) : Math.round((i / (n - 1)) * (chartWidth - 1));
+          // Position based on original index in the full label array
+          const pos = totalN === 1 ? Math.floor(chartWidth / 2) : Math.round((labels[i].origIdx / (totalN - 1)) * (chartWidth - 1));
           // Available space before the next label (or end of chart)
           const nextPos = i < n - 1
-            ? Math.round(((i + 1) / (n - 1)) * (chartWidth - 1))
+            ? Math.round((labels[i + 1].origIdx / (totalN - 1)) * (chartWidth - 1))
             : chartWidth;
-          const maxLen = i < n - 1 ? nextPos - pos : labels[i].length;
-          const truncated = labels[i].slice(0, Math.max(1, maxLen));
+          const maxLen = i < n - 1 ? nextPos - pos : labels[i].text.length;
+          const truncated = labels[i].text.slice(0, Math.max(1, maxLen));
 
           // Center the label around its position; right-align the last label
           const offset = i === n - 1 && n > 1

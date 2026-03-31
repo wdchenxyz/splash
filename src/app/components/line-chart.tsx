@@ -18,6 +18,7 @@ interface LineChartProps {
     showAxis?: boolean | null;
     fill?: boolean | null;
     xLabels?: string[] | null;
+    maxXLabels?: number | null;
   };
 }
 
@@ -128,25 +129,42 @@ export function LineChart({ props }: LineChartProps) {
         );
       })}
 
-      {hasXLabels &&
-        p.xLabels!.map((label, i) => {
-          const n = p.xLabels!.length;
+      {hasXLabels && (() => {
+        const allLabels = p.xLabels!;
+        const n = allLabels.length;
+        // Auto-thin: estimate how many labels fit without overlapping
+        // Each label needs its full text width + generous gap to avoid crowding
+        const charPx = 9;
+        const labelGapPx = 24;
+        const maxLabelPx = Math.max(...allLabels.map((l) => l.length)) * charPx + labelGapPx;
+        const fitCount = Math.max(2, Math.floor(plotW / maxLabelPx));
+        const maxLabels = p.maxXLabels ? Math.min(p.maxXLabels, n) : Math.min(fitCount, n);
+        // Always include first and last; evenly sample the rest
+        const step = n <= maxLabels ? 1 : (n - 1) / (maxLabels - 1);
+        const indices = n <= maxLabels
+          ? Array.from({ length: n }, (_, i) => i)
+          : Array.from({ length: maxLabels }, (_, i) =>
+              i === maxLabels - 1 ? n - 1 : Math.round(i * step)
+            );
+
+        return indices.map((idx) => {
           const x = n === 1
             ? padding.left + plotW / 2
-            : padding.left + (i / (n - 1)) * plotW;
+            : padding.left + (idx / (n - 1)) * plotW;
           return (
             <text
-              key={`xlabel-${i}`}
+              key={`xlabel-${idx}`}
               x={x}
               y={padding.top + plotH + 16}
               textAnchor="middle"
               fontSize="14"
               fill="#9ca3af"
             >
-              {label}
+              {allLabels[idx]}
             </text>
           );
-        })}
+        });
+      })()}
 
       {seriesList.length > 1 && (() => {
         const labeled = seriesList.filter((s) => s.label);
