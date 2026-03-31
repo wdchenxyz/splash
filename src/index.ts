@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createIPCServer, type RenderMessage, type AddSeriesMessage } from "./ipc.js";
 import { createBrowserServer } from "./browser-server.js";
 import { ensurePane, closePane } from "./tmux-manager.js";
+import { resolveDataFiles } from "./resolve-data.js";
 
 type ToolResult = { content: { type: "text"; text: string }[]; isError?: boolean };
 
@@ -114,9 +115,10 @@ server.tool(
         return err("Renderer failed to connect within timeout. Is the tmux pane running?");
       }
 
+      const resolvedSpec = resolveDataFiles(spec as { root: string; elements: Record<string, unknown> });
       const message: RenderMessage = {
         type: "render",
-        spec,
+        spec: resolvedSpec,
         mode: mode ?? "replace",
         ...(state && { state }),
         ...(chartId && { chartId }),
@@ -182,7 +184,8 @@ server.tool(
       const url = await srv.start();
 
       const port = srv.getPort()!;
-      const rewrittenSpec = rewriteImagePaths(spec, port);
+      const resolvedSpec = resolveDataFiles(spec as { root: string; elements: Record<string, unknown> });
+      const rewrittenSpec = rewriteImagePaths(resolvedSpec, port);
 
       const message: RenderMessage = {
         type: "render",
