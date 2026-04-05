@@ -200,4 +200,59 @@ describe("resolveDataFiles", () => {
     expect(props.data).toEqual([10, 20]);
     expect(props.xLabels).toEqual(["Mon", "Tue"]);
   });
+
+  it("auto-detects numeric column from CSV for LineChart", () => {
+    const f = tmpFile("line-csv.csv", "date,value\nMon,10\nTue,20\nWed,30\n");
+    const spec = {
+      root: "c",
+      elements: {
+        c: { type: "LineChart", props: { dataFile: f, label: "CSV" }, children: [] },
+      },
+    };
+    const resolved = resolveDataFiles(spec);
+    const props = (resolved.elements.c as any).props;
+    expect(props.data).toEqual([10, 20, 30]);
+    expect(props.dataFile).toBeUndefined();
+  });
+
+  it("auto-detects value column from CSV for BarChart", () => {
+    const f = tmpFile("bar-csv.csv", "service,latency\napi,45\nweb,30\ndb,12\n");
+    const spec = {
+      root: "c",
+      elements: {
+        c: { type: "BarChart", props: { dataFile: f }, children: [] },
+      },
+    };
+    const resolved = resolveDataFiles(spec);
+    const props = (resolved.elements.c as any).props;
+    expect(props.data).toEqual([
+      { label: "api", value: 45 },
+      { label: "web", value: 30 },
+      { label: "db", value: 12 },
+    ]);
+  });
+
+  it("auto-detects numeric column from CSV for Histogram", () => {
+    const f = tmpFile("hist-csv.csv", "id,latency\na,12\nb,15\nc,20\n");
+    const spec = {
+      root: "c",
+      elements: {
+        c: { type: "Histogram", props: { dataFile: f }, children: [] },
+      },
+    };
+    const resolved = resolveDataFiles(spec);
+    const props = (resolved.elements.c as any).props;
+    expect(props.data).toEqual([12, 15, 20]);
+  });
+
+  it("throws when CSV has no numeric column and no dataColumn specified", () => {
+    const f = tmpFile("no-nums.csv", "name,role\nalice,eng\nbob,pm\n");
+    const spec = {
+      root: "c",
+      elements: {
+        c: { type: "LineChart", props: { dataFile: f }, children: [] },
+      },
+    };
+    expect(() => resolveDataFiles(spec)).toThrow(/no.*numeric.*column/i);
+  });
 });

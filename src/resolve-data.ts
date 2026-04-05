@@ -8,6 +8,14 @@ type Element = {
   children?: string[];
 };
 
+function isNumericValue(v: unknown): boolean {
+  if (typeof v === "number") return !isNaN(v);
+  if (typeof v === "string" && v.trim() !== "") {
+    return !isNaN(Number(v));
+  }
+  return false;
+}
+
 const NUMERIC_ARRAY_TYPES = new Set(["LineChart", "Sparkline", "Histogram"]);
 
 function extractColumn(rows: Record<string, unknown>[], column: string): unknown[] {
@@ -36,7 +44,7 @@ function resolveNumericArray(
     const col = dataColumn as string | undefined;
     if (!col) {
       const firstRow = rows[0];
-      const numericKey = Object.keys(firstRow).find((k) => typeof firstRow[k] === "number");
+      const numericKey = Object.keys(firstRow).find((k) => isNumericValue(firstRow[k]));
       if (!numericKey) throw new Error("dataFile contains objects but no dataColumn specified and no numeric column found");
       resolved.data = toNumbers(extractColumn(rows, numericKey));
     } else {
@@ -64,7 +72,7 @@ function resolveBarChart(
 
   const rows = data as Record<string, unknown>[];
   const lCol = (labelColumn as string) ?? Object.keys(rows[0]).find((k) => typeof rows[0][k] === "string");
-  const vCol = (valueColumn as string) ?? Object.keys(rows[0]).find((k) => typeof rows[0][k] === "number");
+  const vCol = (valueColumn as string) ?? Object.keys(rows[0]).find((k) => isNumericValue(rows[0][k]));
 
   if (!lCol || !vCol) throw new Error("BarChart: cannot auto-detect label/value columns. Specify labelColumn and valueColumn.");
 
