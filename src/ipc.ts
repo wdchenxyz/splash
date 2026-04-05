@@ -1,30 +1,10 @@
 import net from "node:net";
 import fs from "node:fs";
 
+export type { SeriesData, RenderMessage, AddSeriesMessage, SpecMessage } from "./render-contract.js";
+import type { SpecMessage } from "./render-contract.js";
+
 const SOCKET_PATH = process.env.SPLASH_SOCKET ?? `/tmp/splash-${process.pid}.sock`;
-
-export interface SeriesData {
-  data: number[];
-  label?: string;
-  color?: string;
-  fill?: boolean;
-}
-
-export interface RenderMessage {
-  type: "render";
-  spec: { root: string; elements: Record<string, unknown> };
-  state?: Record<string, unknown>;
-  mode?: "replace" | "append" | "clear";
-  chartId?: string;
-}
-
-export interface AddSeriesMessage {
-  type: "add_series";
-  chartId?: string;
-  series: SeriesData;
-}
-
-export type SpecMessage = RenderMessage | AddSeriesMessage;
 
 /**
  * Server side — used by the MCP server to send specs to the renderer.
@@ -87,7 +67,8 @@ export function createIPCServer(socketPath = SOCKET_PATH) {
  */
 export function connectClient(
   onSpec: (message: SpecMessage) => void,
-  socketPath = SOCKET_PATH
+  socketPath = SOCKET_PATH,
+  onDisconnect?: () => void
 ): Promise<net.Socket> {
   return new Promise((resolve, reject) => {
     const socket = net.createConnection(socketPath, () => {
@@ -110,6 +91,20 @@ export function connectClient(
       }
     });
 
-    socket.on("error", reject);
+    let resolved = false;
+    socket.on("connect", () => { resolved = true; });
+
+    socket.on("close", () => {
+      if (resolved && onDisconnect) {
+        onDisconnect();
+      }
+    });
+
+    socket.on("error", (err) => {
+      if (!resolved) {
+        reject(err);
+      }
+      // post-connect errors will trigger close event
+    });
   });
 }

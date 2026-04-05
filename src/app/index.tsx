@@ -10,19 +10,10 @@ import {
   KeyValue, Metric, Link, Markdown, Callout,
   ListComponent, ListItem, Timeline, Sparkline, BarChart,
 } from "./components/standard.js";
+import { applySpecMessage, type SpecEntry } from "../render-session.js";
+import type { Spec, SpecMessage } from "../render-contract.js";
 
 // -- Direct renderer (no @json-render/react dependency) --
-
-type Element = {
-  type: string;
-  props: Record<string, unknown>;
-  children: string[];
-};
-
-type Spec = {
-  root: string;
-  elements: Record<string, Element>;
-};
 
 const components: Record<string, (p: { props: Record<string, unknown>; children?: ReactNode }) => ReactNode> = {
   // shadcn components (direct or adapted)
@@ -67,71 +58,12 @@ function RenderSpec({ spec }: { spec: Spec }) {
 
 // -- WebSocket hook --
 
-interface SpecMessage {
-  type: "render" | "add_series";
-  spec?: { root: string; elements: Record<string, unknown> };
-  state?: Record<string, unknown>;
-  mode?: "replace" | "append" | "clear";
-  chartId?: string;
-  series?: { data: number[]; label?: string; color?: string; fill?: boolean };
-}
-
-function addSeriesToSpec(spec: Spec, chartId: string | undefined, series: SpecMessage["series"]): Spec {
-  if (!series) return spec;
-
-  const targetId = chartId ?? Object.keys(spec.elements).reverse().find(
-    (k) => spec.elements[k]?.type === "LineChart"
-  );
-  if (!targetId) return spec;
-
-  const el = spec.elements[targetId];
-  if (el?.type !== "LineChart") return spec;
-
-  const props = { ...el.props };
-  let seriesList = (props.series as Array<Record<string, unknown>>) ?? [];
-  if (props.data && seriesList.length === 0) {
-    seriesList = [{ data: props.data, label: props.label, color: props.color, fill: props.fill }];
-    delete props.data;
-  }
-  seriesList = [...seriesList, series];
-  props.series = seriesList;
-
-  return {
-    ...spec,
-    elements: { ...spec.elements, [targetId]: { ...el, props } },
-  };
-}
-
 function useWebSocketSpec() {
-  const [specs, setSpecs] = useState<Spec[]>([]);
+  const [specs, setSpecs] = useState<SpecEntry[]>([]);
   const [connected, setConnected] = useState(false);
 
   const handleMessage = useCallback((msg: SpecMessage) => {
-    if (msg.type === "add_series") {
-      setSpecs((prev) => {
-        if (prev.length === 0) return prev;
-        const last = prev[prev.length - 1];
-        const updated = addSeriesToSpec(last, msg.chartId, msg.series);
-        return [...prev.slice(0, -1), updated];
-      });
-      return;
-    }
-
-    if (msg.mode === "clear") {
-      setSpecs([]);
-      return;
-    }
-
-    const spec: Spec = {
-      root: msg.spec!.root,
-      elements: msg.spec!.elements as Record<string, Element>,
-    };
-
-    if (msg.mode === "append") {
-      setSpecs((prev) => [...prev, spec]);
-    } else {
-      setSpecs([spec]);
-    }
+    setSpecs((prev) => applySpecMessage(prev, msg));
   }, []);
 
   useEffect(() => {
@@ -179,9 +111,9 @@ function App() {
       {specs.length === 0 ? (
         <div style={{ color: "#9ca3af", fontSize: 14, padding: 16 }}>Waiting for data...</div>
       ) : (
-        specs.map((spec, i) => (
-          <div key={i} style={{ marginBottom: 16 }}>
-            <RenderSpec spec={spec} />
+        specs.map((entry) => (
+          <div key={entry.id} style={{ marginBottom: 16 }}>
+            <RenderSpec spec={entry.spec} />
           </div>
         ))
       )}

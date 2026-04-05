@@ -1,10 +1,17 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { createIPCServer, type RenderMessage, type AddSeriesMessage } from "./ipc.js";
-import { createBrowserServer } from "./browser-server.js";
-import { ensurePane, closePane } from "./tmux-manager.js";
+import type { RenderMessage, AddSeriesMessage } from "./ipc.js";
+import type { Spec } from "./render-contract.js";
 import { resolveDataFiles } from "./resolve-data.js";
+import {
+  createTmuxTarget,
+  createBrowserTarget,
+  rewriteImagePaths,
+  getTmuxIPC,
+  getBrowserServer,
+  closePane,
+} from "./render-targets.js";
 
 type ToolResult = { content: { type: "text"; text: string }[]; isError?: boolean };
 
@@ -49,44 +56,7 @@ const chartIdSchema = z
   .optional()
   .describe("Optional ID for the chart, used to target it with add_series later.");
 
-function rewriteImagePaths(
-  spec: { root: string; elements: Record<string, unknown> },
-  port: number
-): { root: string; elements: Record<string, unknown> } {
-  const elements = { ...spec.elements };
-  for (const [id, raw] of Object.entries(elements)) {
-    const el = raw as { type?: string; props?: Record<string, unknown> };
-    if (el.type === "Image" && typeof el.props?.src === "string" && el.props.src.startsWith("/")) {
-      const encoded = Buffer.from(el.props.src).toString("base64url");
-      elements[id] = {
-        ...el,
-        props: { ...el.props, src: `http://localhost:${port}/files/${encoded}` },
-      };
-    }
-  }
-  return { ...spec, elements };
-}
-
 // -- Tmux renderer --
-
-let ipc: ReturnType<typeof createIPCServer> | null = null;
-
-async function getIPC() {
-  if (!ipc) {
-    ipc = createIPCServer();
-    await ipc.listening;
-  }
-  return ipc;
-}
-
-async function waitForClient(ipc: ReturnType<typeof createIPCServer>, timeoutMs = 10000): Promise<boolean> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    if (ipc.hasClients()) return true;
-    await new Promise((r) => setTimeout(r, 200));
-  }
-  return ipc.hasClients();
-}
 
 server.tool(
   "render-tmux",
@@ -108,14 +78,14 @@ server.tool(
   },
   async ({ spec, state, title, position, size, mode, chartId }) => {
     try {
-      const ipcServer = await getIPC();
-      await ensurePane({ position, size, socketPath: ipcServer.socketPath });
+      const target = await createTmuxTarget({ position, size });
+      const { ready } = await target.prepare();
 
-      if (!(await waitForClient(ipcServer))) {
+      if (!ready) {
         return err("Renderer failed to connect within timeout. Is the tmux pane running?");
       }
 
-      const resolvedSpec = resolveDataFiles(spec as { root: string; elements: Record<string, unknown> });
+      const resolvedSpec = resolveDataFiles(spec as Spec);
       const message: RenderMessage = {
         type: "render",
         spec: resolvedSpec,
@@ -124,7 +94,7 @@ server.tool(
         ...(chartId && { chartId }),
       };
 
-      if (!ipcServer.sendSpec(message)) {
+      if (!target.send(message)) {
         return err("No renderer connected. The tmux pane may have crashed.");
       }
 
@@ -150,24 +120,6 @@ server.tool(
 
 // -- Browser renderer --
 
-let browser: ReturnType<typeof createBrowserServer> | null = null;
-
-function getBrowser() {
-  if (!browser) {
-    browser = createBrowserServer();
-  }
-  return browser;
-}
-
-async function waitForBrowserClient(srv: ReturnType<typeof createBrowserServer>, timeoutMs = 15000): Promise<boolean> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    if (srv.hasClients()) return true;
-    await new Promise((r) => setTimeout(r, 200));
-  }
-  return srv.hasClients();
-}
-
 server.tool(
   "render-browser",
   "Render a json-render spec in a browser page at localhost:3456. Opens charts, tables, and dashboards with SVG rendering in a local browser window.",
@@ -180,12 +132,11 @@ server.tool(
   },
   async ({ spec, state, title, mode, chartId }) => {
     try {
-      const srv = getBrowser();
-      const url = await srv.start();
+      const target = await createBrowserTarget();
+      const { ready } = await target.prepare();
 
-      const port = srv.getPort()!;
-      const resolvedSpec = resolveDataFiles(spec as { root: string; elements: Record<string, unknown> });
-      const rewrittenSpec = rewriteImagePaths(resolvedSpec, port);
+      const resolvedSpec = resolveDataFiles(spec as Spec);
+      const rewrittenSpec = rewriteImagePaths(resolvedSpec, target.port);
 
       const message: RenderMessage = {
         type: "render",
@@ -195,21 +146,16 @@ server.tool(
         ...(chartId && { chartId }),
       };
 
-      if (!srv.hasClients()) {
-        const { exec } = await import("node:child_process");
-        exec(`open -a "Google Chrome" "${url}" 2>/dev/null || open "${url}" 2>/dev/null || xdg-open "${url}" 2>/dev/null || true`);
-
-        if (!(await waitForBrowserClient(srv))) {
-          srv.sendSpec(message);
-          return ok(`Browser opened at ${url}. Waiting for connection — refresh if needed.`);
-        }
+      if (!ready) {
+        target.send(message);
+        return ok(`Browser opened at ${target.url}. Waiting for connection — refresh if needed.`);
       }
 
-      if (!srv.sendSpec(message)) {
-        return err("No browser connected. Open " + url + " in your browser.");
+      if (!target.send(message)) {
+        return err("No browser connected. Open " + target.url + " in your browser.");
       }
 
-      return ok(`Rendered in browser${title ? `: ${title}` : ""} at ${url}`);
+      return ok(`Rendered in browser${title ? `: ${title}` : ""} at ${target.url}`);
     } catch (error) {
       return err(`Error: ${toErrorMessage(error)}`);
     }
@@ -221,8 +167,7 @@ server.tool(
   "Stop the browser rendering server.",
   async () => {
     try {
-      browser?.close();
-      browser = null;
+      getBrowserServer()?.close();
       return ok("Browser server stopped.");
     } catch (error) {
       return err(`Error: ${toErrorMessage(error)}`);
@@ -262,13 +207,15 @@ server.tool(
       };
 
       let sent = false;
+      const tmuxIpc = getTmuxIPC();
+      const browserSrv = getBrowserServer();
 
-      if (ipc?.hasClients()) {
-        sent = ipc.sendSpec(message) || sent;
+      if (tmuxIpc?.hasClients()) {
+        sent = tmuxIpc.sendSpec(message) || sent;
       }
 
-      if (browser?.hasClients()) {
-        sent = browser.sendSpec(message) || sent;
+      if (browserSrv?.hasClients()) {
+        sent = browserSrv.sendSpec(message) || sent;
       }
 
       if (!sent) {
@@ -285,8 +232,8 @@ server.tool(
 // -- Lifecycle --
 
 async function cleanup() {
-  ipc?.close();
-  browser?.close();
+  getTmuxIPC()?.close();
+  getBrowserServer()?.close();
   await closePane();
   process.exit(0);
 }
