@@ -93,26 +93,45 @@ function App() {
     let retries = 0;
     const maxRetries = 60;
     const retryDelay = 1000;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let destroyed = false;
 
     function connect() {
-      connectClient((message) => {
-        handleMessage(message);
-      })
+      if (destroyed) return;
+
+      connectClient(
+        (message) => { handleMessage(message); },
+        undefined,
+        () => {
+          // Post-connect disconnect — schedule reconnect
+          if (destroyed) return;
+          setConnected(false);
+          retries = 0; // Reset retries for reconnection
+          retryTimer = setTimeout(connect, retryDelay);
+        }
+      )
         .then(() => {
           setConnected(true);
           setError(null);
+          retries = 0;
         })
-        .catch((err) => {
+        .catch(() => {
+          if (destroyed) return;
           if (retries < maxRetries) {
             retries++;
-            setTimeout(connect, retryDelay);
+            retryTimer = setTimeout(connect, retryDelay);
           } else {
-            setError(`Failed to connect: ${err.message}`);
+            setError("Failed to connect after retries. Restart the pane.");
           }
         });
     }
 
     connect();
+
+    return () => {
+      destroyed = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, [handleMessage]);
 
   if (error) {

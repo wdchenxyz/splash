@@ -87,7 +87,8 @@ export function createIPCServer(socketPath = SOCKET_PATH) {
  */
 export function connectClient(
   onSpec: (message: SpecMessage) => void,
-  socketPath = SOCKET_PATH
+  socketPath = SOCKET_PATH,
+  onDisconnect?: () => void
 ): Promise<net.Socket> {
   return new Promise((resolve, reject) => {
     const socket = net.createConnection(socketPath, () => {
@@ -110,6 +111,20 @@ export function connectClient(
       }
     });
 
-    socket.on("error", reject);
+    let resolved = false;
+    socket.on("connect", () => { resolved = true; });
+
+    socket.on("close", () => {
+      if (resolved && onDisconnect) {
+        onDisconnect();
+      }
+    });
+
+    socket.on("error", (err) => {
+      if (!resolved) {
+        reject(err);
+      }
+      // post-connect errors will trigger close event
+    });
   });
 }
