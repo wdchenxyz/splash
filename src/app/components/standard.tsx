@@ -155,19 +155,37 @@ export function ListItem({ props }: { props: Record<string, unknown> }) {
 
 export function Timeline({ props }: { props: Record<string, unknown> }) {
   const items = (props.items as Array<{ title: string; description?: string; date?: string; status?: string }>) ?? [];
-  const statusColors: Record<string, string> = { completed: "#34d399", current: "#60a5fa", upcoming: "#6b7280" };
+  const statusColors: Record<string, string> = {
+    completed: "#34d399", done: "#34d399",
+    current: "#60a5fa", "in-progress": "#60a5fa", active: "#60a5fa",
+    upcoming: "#6b7280", pending: "#6b7280",
+  };
+  const lineColor = "#374151";
   return (
-    <div style={{ paddingLeft: 12 }}>
-      {items.map((item, i) => (
-        <div key={i} style={{ display: "flex", gap: 8, paddingBottom: 8, borderLeft: i < items.length - 1 ? "2px solid #374151" : "none", marginLeft: 4, paddingLeft: 12 }}>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: statusColors[item.status ?? "upcoming"], marginTop: 4, marginLeft: -17 }} />
-          <div>
-            <div style={{ fontWeight: "bold" }}>{item.title}</div>
-            {item.date && <div style={{ color: "#6b7280", fontSize: 11 }}>{item.date}</div>}
-            {item.description && <div style={{ color: "#9ca3af", fontSize: 12 }}>{item.description}</div>}
+    <div style={{ paddingLeft: 16 }}>
+      {items.map((item, i) => {
+        const color = statusColors[item.status ?? "upcoming"] ?? "#6b7280";
+        const filled = item.status === "completed" || item.status === "done";
+        return (
+          <div key={i} style={{ display: "flex", gap: 12, position: "relative", paddingBottom: i < items.length - 1 ? 24 : 0, marginLeft: 6 }}>
+            {/* Vertical line */}
+            {i < items.length - 1 && (
+              <div style={{ position: "absolute", left: 5, top: 14, bottom: 0, width: 2, backgroundColor: lineColor }} />
+            )}
+            {/* Circle node */}
+            <div style={{
+              width: 12, height: 12, borderRadius: "50%", marginTop: 3, flexShrink: 0,
+              border: `2px solid ${color}`,
+              backgroundColor: filled ? color : "transparent",
+            }} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 600 }}>{item.title}</div>
+              {item.date && <div style={{ color: "#6b7280", fontSize: 11, marginTop: 1 }}>{item.date}</div>}
+              {item.description && <div style={{ color: "#9ca3af", fontSize: 12, marginTop: 2 }}>{item.description}</div>}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
