@@ -2,41 +2,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import { render, Box, Text } from "ink";
 import { Renderer, JSONUIProvider } from "@json-render/ink";
 import { registry } from "./catalog.js";
-import {
-  connectClient,
-  type SpecMessage,
-} from "./ipc.js";
-import type { Spec, SpecElement, SeriesData } from "./render-contract.js";
-
-interface SpecEntry {
-  id: string;
-  spec: Spec;
-  state: Record<string, unknown>;
-}
-
-let entryCounter = 0;
-
-function addSeriesToSpec(spec: Spec, series: SeriesData): Spec {
-  const elements = { ...spec.elements };
-  for (const [key, el] of Object.entries(elements)) {
-    if (el.type === "LineChart") {
-      const props = { ...el.props };
-      const existing = props.series as SeriesData[] | undefined;
-      if (!existing) {
-        props.series = props.data
-          ? [{ data: props.data as number[], label: props.label as string, color: props.color as string, fill: props.fill as boolean }]
-          : [];
-        delete props.data;
-      } else {
-        props.series = [...existing];
-      }
-      (props.series as SeriesData[]).push(series);
-      elements[key] = { ...el, props };
-      break;
-    }
-  }
-  return { ...spec, elements };
-}
+import { connectClient, type SpecMessage } from "./ipc.js";
+import { applySpecMessage, type SpecEntry } from "./render-session.js";
 
 function App() {
   const [specs, setSpecs] = useState<SpecEntry[]>([]);
@@ -44,38 +11,7 @@ function App() {
   const [connected, setConnected] = useState(false);
 
   const handleMessage = useCallback((message: SpecMessage) => {
-    if (message.type === "add_series") {
-      setSpecs((prev) => {
-        const idx = message.chartId
-          ? prev.findIndex((e) => e.id === message.chartId)
-          : prev.length - 1;
-        if (idx < 0) return prev;
-
-        const entry = prev[idx];
-        const updated = [...prev];
-        updated[idx] = { ...entry, spec: addSeriesToSpec(entry.spec, message.series) };
-        return updated;
-      });
-      return;
-    }
-
-    const mode = message.mode ?? "replace";
-    if (mode === "clear") {
-      setSpecs([]);
-      return;
-    }
-
-    const entry: SpecEntry = {
-      id: message.chartId ?? `spec-${entryCounter++}`,
-      spec: message.spec as Spec,
-      state: message.state ?? {},
-    };
-
-    if (mode === "append") {
-      setSpecs((prev) => [...prev, entry]);
-    } else {
-      setSpecs([entry]);
-    }
+    setSpecs((prev) => applySpecMessage(prev, message));
   }, []);
 
   useEffect(() => {
