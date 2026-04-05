@@ -5,19 +5,8 @@ import { registry } from "./catalog.js";
 import {
   connectClient,
   type SpecMessage,
-  type SeriesData,
 } from "./ipc.js";
-
-interface ElementDef {
-  type: string;
-  props: Record<string, unknown>;
-  children?: string[];
-}
-
-interface Spec {
-  root: string;
-  elements: Record<string, ElementDef>;
-}
+import type { Spec, SpecElement, SeriesData } from "./render-contract.js";
 
 interface SpecEntry {
   id: string;

@@ -11,18 +11,9 @@ import {
   ListComponent, ListItem, Timeline, Sparkline, BarChart,
 } from "./components/standard.js";
 
+import type { Spec, SpecElement, SpecMessage, SeriesData } from "../render-contract.js";
+
 // -- Direct renderer (no @json-render/react dependency) --
-
-type Element = {
-  type: string;
-  props: Record<string, unknown>;
-  children: string[];
-};
-
-type Spec = {
-  root: string;
-  elements: Record<string, Element>;
-};
 
 const components: Record<string, (p: { props: Record<string, unknown>; children?: ReactNode }) => ReactNode> = {
   // shadcn components (direct or adapted)
@@ -67,16 +58,7 @@ function RenderSpec({ spec }: { spec: Spec }) {
 
 // -- WebSocket hook --
 
-interface SpecMessage {
-  type: "render" | "add_series";
-  spec?: { root: string; elements: Record<string, unknown> };
-  state?: Record<string, unknown>;
-  mode?: "replace" | "append" | "clear";
-  chartId?: string;
-  series?: { data: number[]; label?: string; color?: string; fill?: boolean };
-}
-
-function addSeriesToSpec(spec: Spec, chartId: string | undefined, series: SpecMessage["series"]): Spec {
+function addSeriesToSpec(spec: Spec, chartId: string | undefined, series: SeriesData | undefined): Spec {
   if (!series) return spec;
 
   const targetId = chartId ?? Object.keys(spec.elements).reverse().find(
@@ -122,10 +104,7 @@ function useWebSocketSpec() {
       return;
     }
 
-    const spec: Spec = {
-      root: msg.spec!.root,
-      elements: msg.spec!.elements as Record<string, Element>,
-    };
+    const spec = msg.spec!;
 
     if (msg.mode === "append") {
       setSpecs((prev) => [...prev, spec]);

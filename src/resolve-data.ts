@@ -1,12 +1,5 @@
 import { parseDataFile, type ParsedData } from "./data-file.js";
-
-type Spec = { root: string; elements: Record<string, unknown> };
-
-type Element = {
-  type?: string;
-  props?: Record<string, unknown>;
-  children?: string[];
-};
+import type { Spec, SpecElement } from "./render-contract.js";
 
 function isNumericValue(v: unknown): boolean {
   if (typeof v === "number") return !isNaN(v);
@@ -127,7 +120,7 @@ export function resolveDataFiles(spec: Spec): Spec {
   let changed = false;
 
   for (const [id, raw] of Object.entries(elements)) {
-    const el = raw as Element;
+    const el = raw as SpecElement;
     if (!el.props?.dataFile) continue;
 
     const filePath = el.props.dataFile as string;

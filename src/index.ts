@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { createIPCServer, type RenderMessage, type AddSeriesMessage } from "./ipc.js";
+import type { Spec } from "./render-contract.js";
 import { createBrowserServer } from "./browser-server.js";
 import { ensurePane, closePane } from "./tmux-manager.js";
 import { resolveDataFiles } from "./resolve-data.js";
@@ -49,13 +50,9 @@ const chartIdSchema = z
   .optional()
   .describe("Optional ID for the chart, used to target it with add_series later.");
 
-function rewriteImagePaths(
-  spec: { root: string; elements: Record<string, unknown> },
-  port: number
-): { root: string; elements: Record<string, unknown> } {
+function rewriteImagePaths(spec: Spec, port: number): Spec {
   const elements = { ...spec.elements };
-  for (const [id, raw] of Object.entries(elements)) {
-    const el = raw as { type?: string; props?: Record<string, unknown> };
+  for (const [id, el] of Object.entries(elements)) {
     if (el.type === "Image" && typeof el.props?.src === "string" && el.props.src.startsWith("/")) {
       const encoded = Buffer.from(el.props.src).toString("base64url");
       elements[id] = {
@@ -115,7 +112,7 @@ server.tool(
         return err("Renderer failed to connect within timeout. Is the tmux pane running?");
       }
 
-      const resolvedSpec = resolveDataFiles(spec as { root: string; elements: Record<string, unknown> });
+      const resolvedSpec = resolveDataFiles(spec as Spec);
       const message: RenderMessage = {
         type: "render",
         spec: resolvedSpec,
@@ -184,7 +181,7 @@ server.tool(
       const url = await srv.start();
 
       const port = srv.getPort()!;
-      const resolvedSpec = resolveDataFiles(spec as { root: string; elements: Record<string, unknown> });
+      const resolvedSpec = resolveDataFiles(spec as Spec);
       const rewrittenSpec = rewriteImagePaths(resolvedSpec, port);
 
       const message: RenderMessage = {

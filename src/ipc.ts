@@ -1,30 +1,10 @@
 import net from "node:net";
 import fs from "node:fs";
 
+export type { SeriesData, RenderMessage, AddSeriesMessage, SpecMessage } from "./render-contract.js";
+import type { SpecMessage } from "./render-contract.js";
+
 const SOCKET_PATH = process.env.SPLASH_SOCKET ?? `/tmp/splash-${process.pid}.sock`;
-
-export interface SeriesData {
-  data: number[];
-  label?: string;
-  color?: string;
-  fill?: boolean;
-}
-
-export interface RenderMessage {
-  type: "render";
-  spec: { root: string; elements: Record<string, unknown> };
-  state?: Record<string, unknown>;
-  mode?: "replace" | "append" | "clear";
-  chartId?: string;
-}
-
-export interface AddSeriesMessage {
-  type: "add_series";
-  chartId?: string;
-  series: SeriesData;
-}
-
-export type SpecMessage = RenderMessage | AddSeriesMessage;
 
 /**
  * Server side — used by the MCP server to send specs to the renderer.
