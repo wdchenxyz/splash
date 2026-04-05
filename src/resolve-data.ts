@@ -102,6 +102,37 @@ function resolveTable(
   };
 }
 
+function resolveTimeline(
+  data: ParsedData,
+  props: Record<string, unknown>
+): Record<string, unknown> {
+  const { dataFile, titleColumn, descriptionColumn, dateColumn, statusColumn, ...rest } = props;
+
+  if (!Array.isArray(data) || data.length === 0 || typeof data[0] !== "object" || Array.isArray(data[0])) {
+    throw new Error("Timeline dataFile must contain an array of objects");
+  }
+
+  const rows = data as Record<string, unknown>[];
+  const keys = Object.keys(rows[0]);
+  const tCol = (titleColumn as string) ?? keys.find((k) => typeof rows[0][k] === "string");
+
+  if (!tCol) throw new Error("Timeline: cannot auto-detect title column. Specify titleColumn.");
+
+  const dCol = descriptionColumn as string | undefined;
+  const dtCol = dateColumn as string | undefined;
+  const sCol = statusColumn as string | undefined;
+
+  return {
+    ...rest,
+    items: rows.map((r) => ({
+      title: String(r[tCol]),
+      ...(dCol && r[dCol] != null && { description: String(r[dCol]) }),
+      ...(dtCol && r[dtCol] != null && { date: String(r[dtCol]) }),
+      ...(sCol && r[sCol] != null && { status: String(r[sCol]) }),
+    })),
+  };
+}
+
 function resolveHeatmap(
   data: ParsedData,
   props: Record<string, unknown>
@@ -133,6 +164,8 @@ export function resolveDataFiles(spec: Spec): Spec {
       resolvedProps = resolveBarChart(data, el.props);
     } else if (el.type === "Table") {
       resolvedProps = resolveTable(data, el.props);
+    } else if (el.type === "Timeline") {
+      resolvedProps = resolveTimeline(data, el.props);
     } else if (el.type === "Heatmap") {
       resolvedProps = resolveHeatmap(data, el.props);
     } else {
