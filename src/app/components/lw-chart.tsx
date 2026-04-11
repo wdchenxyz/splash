@@ -15,6 +15,7 @@ const DARK_THEME: DeepPartial<ChartOptions> = {
     background: { color: "transparent" },
     textColor: "#9ca3af",
     fontFamily: "monospace",
+    attributionLogo: false,
   },
   grid: {
     vertLines: { color: "#1f2937" },
