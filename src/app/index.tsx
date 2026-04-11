@@ -9,8 +9,9 @@ import { CandlestickChart, AreaChart, BaselineChart } from "./components/lw-char
 import {
   Box, Spacer, Newline, Divider, Text, StatusLine,
   KeyValue, Metric, Link, Markdown, Callout,
-  ListComponent, ListItem, Timeline, Sparkline, BarChart,
+  ListComponent, ListItem, Timeline, Sparkline,
 } from "./components/standard.js";
+import { BarChart } from "./components/bar-chart.js";
 import { applySpecMessage, type SpecEntry } from "../render-session.js";
 import type { Spec, SpecMessage } from "../render-contract.js";
 

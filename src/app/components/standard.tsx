@@ -282,31 +282,4 @@ export function Sparkline({ props }: { props: Record<string, unknown> }) {
   );
 }
 
-export function BarChart({ props }: { props: Record<string, unknown> }) {
-  const data = (props.data as Array<{ label: string; value: number; color?: string }>) ?? [];
-  if (data.length === 0) return null;
-
-  const maxVal = Math.max(...data.map((d) => d.value));
-  const barWidth = ((props.width as number) ?? 40) * 6;
-  const showValues = (props.showValues as boolean) !== false;
-  const showPercentage = (props.showPercentage as boolean) ?? false;
-  const total = data.reduce((s, d) => s + d.value, 0);
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1, width: "100%", maxWidth: barWidth }}>
-      {data.map((d, i) => {
-        const pct = maxVal > 0 ? (d.value / maxVal) * 100 : 0;
-        return (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ color: "#9ca3af", fontSize: 12, minWidth: 100, textAlign: "right", flexShrink: 0 }}>{d.label}</span>
-            <div style={{ flex: 1, height: 16, position: "relative" }}>
-              <div style={{ width: `${pct}%`, height: "100%", backgroundColor: d.color ?? "#22c55e", borderRadius: 3 }} />
-            </div>
-            {showValues && <span style={{ fontSize: 12, color: "#9ca3af", flexShrink: 0 }}>{d.value}{showPercentage ? ` (${Math.round((d.value / total) * 100)}%)` : ""}</span>}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
