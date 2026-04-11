@@ -92,6 +92,11 @@ export function createBrowserServer(port = DEFAULT_PORT) {
       --input: oklch(0.269 0 0);
       --ring: oklch(0.556 0 0);
       --radius: 0.625rem;
+      --chart-1: #2563eb;
+      --chart-2: #16a34a;
+      --chart-3: #eab308;
+      --chart-4: #a855f7;
+      --chart-5: #ef4444;
     }
   </style>
 </head>

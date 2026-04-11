@@ -97,7 +97,7 @@ describe("resolveDataFiles", () => {
     expect(props.dataColumn).toBeUndefined();
   });
 
-  it("resolves BarChart with labelColumn and valueColumn", () => {
+  it("resolves BarChart with explicit categoryKey", () => {
     const f = tmpFile("bar.json", JSON.stringify([
       { service: "api", latency: 45 },
       { service: "web", latency: 30 },
@@ -107,17 +107,22 @@ describe("resolveDataFiles", () => {
       elements: {
         c: {
           type: "BarChart",
-          props: { dataFile: f, labelColumn: "service", valueColumn: "latency" },
+          props: { dataFile: f, categoryKey: "service" },
           children: [],
         },
       },
     };
     const resolved = resolveDataFiles(spec);
     const props = (resolved.elements.c as any).props;
+    expect(props.categoryKey).toBe("service");
     expect(props.data).toEqual([
-      { label: "api", value: 45 },
-      { label: "web", value: 30 },
+      { service: "api", latency: 45 },
+      { service: "web", latency: 30 },
     ]);
+    expect(props.series).toEqual([
+      { dataKey: "latency", color: "var(--chart-1)", label: "latency" },
+    ]);
+    expect(props.dataFile).toBeUndefined();
   });
 
   it("resolves Table dataFile with auto headers", () => {
@@ -215,7 +220,7 @@ describe("resolveDataFiles", () => {
     expect(props.dataFile).toBeUndefined();
   });
 
-  it("auto-detects value column from CSV for BarChart", () => {
+  it("auto-detects categoryKey and series from CSV for BarChart", () => {
     const f = tmpFile("bar-csv.csv", "service,latency\napi,45\nweb,30\ndb,12\n");
     const spec = {
       root: "c",
@@ -225,11 +230,35 @@ describe("resolveDataFiles", () => {
     };
     const resolved = resolveDataFiles(spec);
     const props = (resolved.elements.c as any).props;
+    expect(props.categoryKey).toBe("service");
     expect(props.data).toEqual([
-      { label: "api", value: 45 },
-      { label: "web", value: 30 },
-      { label: "db", value: 12 },
+      { service: "api", latency: 45 },
+      { service: "web", latency: 30 },
+      { service: "db", latency: 12 },
     ]);
+    expect(props.series).toEqual([
+      { dataKey: "latency", color: "var(--chart-1)", label: "latency" },
+    ]);
+  });
+
+  it("auto-detects multiple numeric series from CSV for BarChart", () => {
+    const f = tmpFile("bar-multi.csv", "month,desktop,mobile\nJan,186,80\nFeb,305,200\n");
+    const spec = {
+      root: "c",
+      elements: {
+        c: { type: "BarChart", props: { dataFile: f }, children: [] },
+      },
+    };
+    const resolved = resolveDataFiles(spec);
+    const props = (resolved.elements.c as any).props;
+    expect(props.categoryKey).toBe("month");
+    expect(props.data).toEqual([
+      { month: "Jan", desktop: 186, mobile: 80 },
+      { month: "Feb", desktop: 305, mobile: 200 },
+    ]);
+    expect(props.series).toHaveLength(2);
+    expect(props.series[0]).toEqual({ dataKey: "desktop", color: "var(--chart-1)", label: "desktop" });
+    expect(props.series[1]).toEqual({ dataKey: "mobile", color: "var(--chart-2)", label: "mobile" });
   });
 
   it("auto-detects numeric column from CSV for Histogram", () => {

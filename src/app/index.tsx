@@ -9,8 +9,10 @@ import { CandlestickChart, AreaChart, BaselineChart } from "./components/lw-char
 import {
   Box, Spacer, Newline, Divider, Text, StatusLine,
   KeyValue, Metric, Link, Markdown, Callout,
-  ListComponent, ListItem, Timeline, Sparkline, BarChart,
+  ListComponent, ListItem, Timeline,
 } from "./components/standard.js";
+import { Sparkline } from "./components/sparkline.js";
+import { BarChart } from "./components/bar-chart.js";
 import { applySpecMessage, type SpecEntry } from "../render-session.js";
 import type { Spec, SpecMessage } from "../render-contract.js";
 
@@ -121,6 +123,18 @@ function App() {
       )}
     </div>
   );
+}
+
+// Ensure chart CSS variables exist (the HTML shell defines them, but this
+// covers cases where the app bundle is newer than the running server's template).
+const _chartFallbacks: Record<string, string> = {
+  "--chart-1": "#2563eb", "--chart-2": "#16a34a", "--chart-3": "#eab308",
+  "--chart-4": "#a855f7", "--chart-5": "#ef4444",
+};
+for (const [k, v] of Object.entries(_chartFallbacks)) {
+  if (!getComputedStyle(document.documentElement).getPropertyValue(k).trim()) {
+    document.documentElement.style.setProperty(k, v);
+  }
 }
 
 try {

@@ -11,6 +11,14 @@ function isNumericValue(v: unknown): boolean {
 
 const NUMERIC_ARRAY_TYPES = new Set(["LineChart", "Sparkline", "Histogram", "AreaChart", "BaselineChart"]);
 
+const CHART_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+];
+
 function extractColumn(rows: Record<string, unknown>[], column: string): unknown[] {
   return rows.map((r) => r[column]);
 }
@@ -57,25 +65,53 @@ function resolveBarChart(
   data: ParsedData,
   props: Record<string, unknown>
 ): Record<string, unknown> {
-  const { dataFile, labelColumn, valueColumn, ...rest } = props;
+  const { dataFile, categoryKey: explicitCategoryKey, series: explicitSeries, ...rest } = props;
 
   if (!Array.isArray(data) || data.length === 0 || typeof data[0] !== "object" || Array.isArray(data[0])) {
     throw new Error("BarChart dataFile must contain an array of objects");
   }
 
   const rows = data as Record<string, unknown>[];
-  const lCol = (labelColumn as string) ?? Object.keys(rows[0]).find((k) => typeof rows[0][k] === "string");
-  const vCol = (valueColumn as string) ?? Object.keys(rows[0]).find((k) => isNumericValue(rows[0][k]));
+  const keys = Object.keys(rows[0]);
 
-  if (!lCol || !vCol) throw new Error("BarChart: cannot auto-detect label/value columns. Specify labelColumn and valueColumn.");
+  const categoryKey =
+    (explicitCategoryKey as string) ??
+    keys.find((k) => typeof rows[0][k] === "string");
+  if (!categoryKey) {
+    throw new Error("BarChart: cannot auto-detect categoryKey. Specify categoryKey.");
+  }
 
-  return {
-    ...rest,
-    data: rows.map((r) => ({
-      label: String(r[lCol]),
-      value: Number(r[vCol]),
-    })),
-  };
+  let series: Array<{ dataKey: string; color: string; label: string }>;
+  if (explicitSeries) {
+    series = explicitSeries as typeof series;
+  } else {
+    const numericKeys = keys.filter(
+      (k) => k !== categoryKey && isNumericValue(rows[0][k])
+    );
+    if (numericKeys.length === 0) {
+      throw new Error(
+        "BarChart: no numeric columns found for series. Specify series."
+      );
+    }
+    series = numericKeys.map((k, i) => ({
+      dataKey: k,
+      color: CHART_COLORS[i % CHART_COLORS.length],
+      label: k,
+    }));
+  }
+
+  // Cast numeric values and preserve category as string
+  const castData = rows.map((row) => {
+    const out: Record<string, unknown> = {
+      [categoryKey]: String(row[categoryKey]),
+    };
+    for (const s of series) {
+      out[s.dataKey] = Number(row[s.dataKey]);
+    }
+    return out;
+  });
+
+  return { ...rest, data: castData, categoryKey, series };
 }
 
 function resolveTable(
