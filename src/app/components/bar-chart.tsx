@@ -111,7 +111,7 @@ export function BarChart({ props: p }: BarChartProps) {
                 tickMargin={10}
                 axisLine={false}
                 tick={{ fill: "#9ca3af", fontSize: 12 }}
-                width={100}
+                width={Math.max(100, ...data.map(d => String(d[categoryKey] ?? "").length * 7.5 + 16))}
               />
             </>
           ) : (
