@@ -251,35 +251,5 @@ export function Timeline({ props }: { props: Record<string, unknown> }) {
   );
 }
 
-// -- Data Visualization --
-
-export function Sparkline({ props }: { props: Record<string, unknown> }) {
-  const data = (props.data as number[]) ?? [];
-  if (data.length === 0) return null;
-
-  const width = ((props.width as number) ?? 60) * 6;
-  const height = 24;
-  const color = (props.color as string) ?? "#22c55e";
-  const min = props.min != null ? (props.min as number) : Math.min(...data);
-  const max = props.max != null ? (props.max as number) : Math.max(...data);
-  const range = max - min || 1;
-
-  const points = data
-    .map((v, i) => {
-      const x = (i / (data.length - 1)) * width;
-      const y = height - ((v - min) / range) * height;
-      return `${x},${y}`;
-    })
-    .join(" ");
-
-  return (
-    <div>
-      {props.label && <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 2 }}>{props.label as string}</div>}
-      <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", maxWidth: width, height }}>
-        <polyline points={points} fill="none" stroke={color} strokeWidth={1.5} />
-      </svg>
-    </div>
-  );
-}
 
 
