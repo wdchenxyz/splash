@@ -10,7 +10,7 @@ import {
 
 // -- Shared wrapper --
 
-const DARK_THEME: DeepPartial<ChartOptions> = {
+export const DARK_THEME: DeepPartial<ChartOptions> = {
   layout: {
     background: { color: "transparent" },
     textColor: "#9ca3af",
@@ -34,7 +34,7 @@ const DARK_THEME: DeepPartial<ChartOptions> = {
   },
 };
 
-function normalizeTime(t: unknown): string | number {
+export function normalizeTime(t: unknown): string | number {
   if (typeof t === "number") return t;
   return String(t);
 }
@@ -128,7 +128,7 @@ interface AreaChartProps {
   };
 }
 
-function toTimeValueData(data: (number | TimeValuePoint)[]): TimeValuePoint[] {
+export function toTimeValueData(data: (number | TimeValuePoint)[]): TimeValuePoint[] {
   if (data.length === 0) return [];
   if (typeof data[0] === "number") {
     return (data as number[]).map((value, i) => ({ time: i as any, value }));
