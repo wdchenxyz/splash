@@ -1,5 +1,5 @@
 import React from "react";
-import { LineChart, Line, ResponsiveContainer } from "recharts";
+import { LineChart, Line, YAxis, ResponsiveContainer } from "recharts";
 
 interface SparklineProps {
   props: Record<string, unknown>;
@@ -9,11 +9,11 @@ export function Sparkline({ props: p }: SparklineProps) {
   const data = (p.data as number[]) ?? [];
   if (data.length === 0) return null;
 
-  const width = ((p.width as number) ?? 60) * 6;
-  const height = 24;
+  const maxWidth = p.width ? ((p.width as number) * 6) : undefined;
+  const height = 36;
   const color = (p.color as string) ?? "#22c55e";
-  const min = p.min != null ? (p.min as number) : undefined;
-  const max = p.max != null ? (p.max as number) : undefined;
+  const min = p.min != null ? (p.min as number) : "dataMin";
+  const max = p.max != null ? (p.max as number) : "dataMax";
 
   const chartData = data.map((value) => ({ value }));
 
@@ -24,9 +24,10 @@ export function Sparkline({ props: p }: SparklineProps) {
           {p.label as string}
         </div>
       )}
-      <div style={{ width, height }}>
+      <div style={{ width: "100%", maxWidth, height }}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData}>
+          <LineChart data={chartData} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
+            <YAxis hide domain={[min, max]} />
             <Line
               type="monotone"
               dataKey="value"
