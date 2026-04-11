@@ -9,7 +9,7 @@ function isNumericValue(v: unknown): boolean {
   return false;
 }
 
-const NUMERIC_ARRAY_TYPES = new Set(["LineChart", "Sparkline", "Histogram"]);
+const NUMERIC_ARRAY_TYPES = new Set(["LineChart", "Sparkline", "Histogram", "AreaChart", "BaselineChart"]);
 
 function extractColumn(rows: Record<string, unknown>[], column: string): unknown[] {
   return rows.map((r) => r[column]);
@@ -146,6 +146,36 @@ function resolveHeatmap(
   return { ...rest, data };
 }
 
+function resolveCandlestick(
+  data: ParsedData,
+  props: Record<string, unknown>
+): Record<string, unknown> {
+  const { dataFile, ...rest } = props;
+
+  if (!Array.isArray(data) || data.length === 0 || typeof data[0] !== "object" || Array.isArray(data[0])) {
+    throw new Error("CandlestickChart dataFile must contain an array of objects with time/open/high/low/close fields");
+  }
+
+  const rows = data as Record<string, unknown>[];
+  const required = ["open", "high", "low", "close"];
+  for (const key of required) {
+    if (!(key in rows[0])) throw new Error(`CandlestickChart: missing required field "${key}"`);
+  }
+
+  const timeKey = Object.keys(rows[0]).find((k) => !required.includes(k)) ?? "time";
+
+  return {
+    ...rest,
+    data: rows.map((r) => ({
+      time: r[timeKey] != null ? String(r[timeKey]) : "",
+      open: Number(r.open),
+      high: Number(r.high),
+      low: Number(r.low),
+      close: Number(r.close),
+    })),
+  };
+}
+
 export function resolveDataFiles(spec: Spec): Spec {
   const elements = { ...spec.elements };
   let changed = false;
@@ -160,6 +190,8 @@ export function resolveDataFiles(spec: Spec): Spec {
 
     if (NUMERIC_ARRAY_TYPES.has(el.type!)) {
       resolvedProps = resolveNumericArray(data, el.props);
+    } else if (el.type === "CandlestickChart") {
+      resolvedProps = resolveCandlestick(data, el.props);
     } else if (el.type === "BarChart") {
       resolvedProps = resolveBarChart(data, el.props);
     } else if (el.type === "Table") {

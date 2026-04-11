@@ -314,4 +314,55 @@ describe("resolveDataFiles", () => {
     };
     expect(() => resolveDataFiles(spec)).toThrow(/no.*numeric.*column/i);
   });
+
+  it("resolves CandlestickChart dataFile from JSON objects", () => {
+    const f = tmpFile("ohlc.json", JSON.stringify([
+      { time: "2024-01-01", open: 100, high: 105, low: 98, close: 103 },
+      { time: "2024-01-02", open: 103, high: 110, low: 101, close: 108 },
+    ]));
+    const spec = {
+      root: "c",
+      elements: {
+        c: { type: "CandlestickChart", props: { dataFile: f, label: "AAPL" }, children: [] },
+      },
+    };
+    const resolved = resolveDataFiles(spec);
+    const props = (resolved.elements.c as any).props;
+    expect(props.data).toEqual([
+      { time: "2024-01-01", open: 100, high: 105, low: 98, close: 103 },
+      { time: "2024-01-02", open: 103, high: 110, low: 101, close: 108 },
+    ]);
+    expect(props.dataFile).toBeUndefined();
+    expect(props.label).toBe("AAPL");
+  });
+
+  it("resolves CandlestickChart dataFile from CSV", () => {
+    const f = tmpFile("ohlc.csv", "time,open,high,low,close\n2024-01-01,100,105,98,103\n2024-01-02,103,110,101,108\n");
+    const spec = {
+      root: "c",
+      elements: {
+        c: { type: "CandlestickChart", props: { dataFile: f }, children: [] },
+      },
+    };
+    const resolved = resolveDataFiles(spec);
+    const props = (resolved.elements.c as any).props;
+    expect(props.data).toHaveLength(2);
+    expect(props.data[0].open).toBe(100);
+    expect(props.data[0].time).toBe("2024-01-01");
+  });
+
+  it("resolves AreaChart and BaselineChart via numeric array path", () => {
+    const f = tmpFile("area.json", "[10, 20, 30, 40]");
+    for (const type of ["AreaChart", "BaselineChart"]) {
+      const spec = {
+        root: "c",
+        elements: {
+          c: { type, props: { dataFile: f }, children: [] },
+        },
+      };
+      const resolved = resolveDataFiles(spec);
+      const props = (resolved.elements.c as any).props;
+      expect(props.data).toEqual([10, 20, 30, 40]);
+    }
+  });
 });

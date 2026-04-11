@@ -10,4 +10,6 @@ export const registry: ComponentRegistry = {
   Histogram,
   Heatmap,
   Image,
+  AreaChart: LineChart,
+  BaselineChart: LineChart,
 };

@@ -1,4 +1,12 @@
-import React from "react";
+import React, { useRef, useEffect } from "react";
+import {
+  createChart,
+  LineSeries,
+  AreaSeries,
+} from "lightweight-charts";
+import { DARK_THEME, normalizeTime, toTimeValueData } from "./lw-chart.js";
+
+const DEFAULT_COLORS = ["#22c55e", "#06b6d4", "#eab308", "#d946ef", "#ef4444", "#3b82f6", "#9ca3af"];
 
 interface Series {
   data: number[];
@@ -22,171 +30,98 @@ interface LineChartProps {
   };
 }
 
-const DEFAULT_COLORS = ["#22c55e", "#06b6d4", "#eab308", "#d946ef", "#ef4444", "#3b82f6", "#9ca3af"];
+export function LineChart({ props: p }: LineChartProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const width = (p.width ?? 60) * 8;
+  const height = (p.height ?? 12) * 16;
 
-function resample(data: number[], count: number): number[] {
-  if (data.length <= 1) return data;
-  const result: number[] = [];
-  for (let i = 0; i < count; i++) {
-    const idx = (i / (count - 1)) * (data.length - 1);
-    const lo = Math.floor(idx);
-    const hi = Math.min(lo + 1, data.length - 1);
-    const t = idx - lo;
-    result.push(data[lo] * (1 - t) + data[hi] * t);
-  }
-  return result;
-}
-
-export function LineChart({ props }: LineChartProps) {
-  const p = props;
-  const svgWidth = (p.width ?? 60) * 8;
-  const svgHeight = (p.height ?? 12) * 16;
-  const showAxis = p.showAxis !== false;
-  const hasXLabels = p.xLabels && p.xLabels.length > 0;
-  const hasLegend = (p.series?.length ?? 0) > 1;
-  const bottomPad = hasXLabels && hasLegend ? 58 : hasXLabels ? 44 : hasLegend ? 40 : 28;
-  const padding = { top: 24, right: hasXLabels ? 30 : 12, bottom: bottomPad, left: showAxis ? 60 : 12 };
-  const plotW = svgWidth - padding.left - padding.right;
-  const plotH = svgHeight - padding.top - padding.bottom;
-
+  // Normalize to series array (for legend rendering outside useEffect)
   const seriesList: Series[] = p.series
     ? p.series
     : p.data
       ? [{ data: p.data, label: p.label, color: p.color, fill: p.fill }]
       : [];
 
-  if (seriesList.length === 0 || seriesList.every((s) => !s.data?.length)) return null;
+  const hasData = seriesList.length > 0 && seriesList.some((s) => s.data?.length);
 
-  let globalMin = Infinity;
-  let globalMax = -Infinity;
-  for (const s of seriesList) {
-    for (const v of s.data) {
-      if (v < globalMin) globalMin = v;
-      if (v > globalMax) globalMax = v;
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !hasData) return;
+
+    const series: Series[] = p.series
+      ? p.series
+      : p.data
+        ? [{ data: p.data, label: p.label, color: p.color, fill: p.fill }]
+        : [];
+
+    const chart = createChart(container, {
+      width,
+      height,
+      ...DARK_THEME,
+      rightPriceScale: {
+        ...DARK_THEME.rightPriceScale,
+        visible: p.showAxis !== false,
+      },
+    });
+
+    for (let i = 0; i < series.length; i++) {
+      const s = series[i];
+      if (!s.data?.length) continue;
+
+      const color = (s.color as string) ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length];
+      const tvData = toTimeValueData(s.data);
+      const mapped = tvData.map((d) => ({
+        time: normalizeTime(d.time) as any,
+        value: d.value,
+      }));
+
+      if (s.fill) {
+        const lwSeries = chart.addSeries(AreaSeries, {
+          lineColor: color,
+          topColor: color + "80",
+          bottomColor: color + "10",
+          lineWidth: 2,
+        });
+        lwSeries.setData(mapped);
+      } else {
+        const lwSeries = chart.addSeries(LineSeries, {
+          color,
+          lineWidth: 2,
+        });
+        lwSeries.setData(mapped);
+      }
     }
-  }
-  const range = globalMax - globalMin || 1;
 
-  const pointCount = Math.min(plotW, 200);
+    chart.timeScale().fitContent();
 
-  function toPath(data: number[]): string {
-    const resampled = resample(data, pointCount);
-    return resampled
-      .map((v, i) => {
-        const x = padding.left + (i / (pointCount - 1)) * plotW;
-        const y = padding.top + (1 - (v - globalMin) / range) * plotH;
-        return `${i === 0 ? "M" : "L"}${x},${y}`;
-      })
-      .join(" ");
-  }
+    return () => chart.remove();
+  }, [p.data, p.series, p.color, p.fill, p.label, width, height, p.showAxis, hasData]);
 
-  function toFillPath(data: number[]): string {
-    const resampled = resample(data, pointCount);
-    const line = resampled
-      .map((v, i) => {
-        const x = padding.left + (i / (pointCount - 1)) * plotW;
-        const y = padding.top + (1 - (v - globalMin) / range) * plotH;
-        return `${i === 0 ? "M" : "L"}${x},${y}`;
-      })
-      .join(" ");
-    const bottomRight = `L${padding.left + plotW},${padding.top + plotH}`;
-    const bottomLeft = `L${padding.left},${padding.top + plotH}`;
-    return `${line} ${bottomRight} ${bottomLeft} Z`;
-  }
+  if (!hasData) return null;
 
-  const yDecimals = range < 0.1 ? 3 : range < 1 ? 2 : range < 10 ? 1 : 0;
-  const tickCount = 5;
+  // Build legend for multi-series
+  const labeled = seriesList
+    .map((s, i) => ({ label: s.label, color: (s.color as string) ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length] }))
+    .filter((l) => l.label);
 
   return (
-    <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ width: "100%", maxWidth: svgWidth, fontFamily: "monospace" }}>
+    <div>
       {p.label && (
-        <text x={svgWidth / 2} y={14} textAnchor="middle" fontSize="16" fontWeight="bold" fill="#e5e7eb">
+        <div style={{ color: "#e5e7eb", fontWeight: "bold", fontSize: 16, marginBottom: 4, fontFamily: "monospace" }}>
           {p.label}
-        </text>
+        </div>
       )}
-
-      {showAxis &&
-        Array.from({ length: tickCount }, (_, i) => {
-          const val = globalMax - (i / (tickCount - 1)) * range;
-          const y = padding.top + (i / (tickCount - 1)) * plotH;
-          return (
-            <g key={i}>
-              <line x1={padding.left} y1={y} x2={padding.left + plotW} y2={y} stroke="#374151" strokeWidth={0.5} />
-              <text x={padding.left - 4} y={y + 4} textAnchor="end" fontSize="14" fill="#9ca3af">
-                {val.toFixed(yDecimals)}
-              </text>
-            </g>
-          );
-        })}
-
-      {seriesList.map((s, i) => {
-        const color = s.color ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length];
-        return (
-          <g key={i}>
-            {(s.fill ?? false) && <path d={toFillPath(s.data)} fill={color} opacity={0.15} />}
-            <path d={toPath(s.data)} fill="none" stroke={color} strokeWidth={1.5} />
-          </g>
-        );
-      })}
-
-      {hasXLabels && (() => {
-        const allLabels = p.xLabels!;
-        const n = allLabels.length;
-        // Auto-thin: estimate how many labels fit without overlapping
-        // Each label needs its full text width + generous gap to avoid crowding
-        const charPx = 9;
-        const labelGapPx = 24;
-        const maxLabelPx = Math.max(...allLabels.map((l) => l.length)) * charPx + labelGapPx;
-        const fitCount = Math.max(2, Math.floor(plotW / maxLabelPx));
-        const maxLabels = p.maxXLabels ? Math.min(p.maxXLabels, n) : Math.min(fitCount, n);
-        // Always include first and last; evenly sample the rest
-        const step = n <= maxLabels ? 1 : (n - 1) / (maxLabels - 1);
-        const indices = n <= maxLabels
-          ? Array.from({ length: n }, (_, i) => i)
-          : Array.from({ length: maxLabels }, (_, i) =>
-              i === maxLabels - 1 ? n - 1 : Math.round(i * step)
-            );
-
-        return indices.map((idx) => {
-          const x = n === 1
-            ? padding.left + plotW / 2
-            : padding.left + (idx / (n - 1)) * plotW;
-          return (
-            <text
-              key={`xlabel-${idx}`}
-              x={x}
-              y={padding.top + plotH + 16}
-              textAnchor="middle"
-              fontSize="14"
-              fill="#9ca3af"
-            >
-              {allLabels[idx]}
-            </text>
-          );
-        });
-      })()}
-
-      {seriesList.length > 1 && (() => {
-        const labeled = seriesList.filter((s) => s.label);
-        let xOffset = padding.left;
-        return (
-          <g>
-            {labeled.map((s, i) => {
-              const color = s.color ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length];
-              const x = xOffset;
-              xOffset += 20 + (s.label?.length ?? 0) * 9 + 16;
-              return (
-                <g key={i} transform={`translate(${x}, ${svgHeight - 6})`}>
-                  <line x1={0} y1={-4} x2={12} y2={-4} stroke={color} strokeWidth={2} />
-                  <text x={16} y={0} fontSize="14" fill="#9ca3af">
-                    {s.label}
-                  </text>
-                </g>
-              );
-            })}
-          </g>
-        );
-      })()}
-    </svg>
+      <div ref={containerRef} style={{ width, height }} />
+      {labeled.length > 1 && (
+        <div style={{ display: "flex", gap: 16, marginTop: 4, fontFamily: "monospace", fontSize: 12 }}>
+          {labeled.map((l, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <div style={{ width: 12, height: 2, backgroundColor: l.color }} />
+              <span style={{ color: "#9ca3af" }}>{l.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

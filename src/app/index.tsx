@@ -5,6 +5,7 @@ import { ShadcnBadge, ShadcnImage, ShadcnProgress, ShadcnTable } from "./compone
 import { LineChart } from "./components/line-chart.js";
 import { Histogram } from "./components/histogram.js";
 import { Heatmap } from "./components/heatmap.js";
+import { CandlestickChart, AreaChart, BaselineChart } from "./components/lw-chart.js";
 import {
   Box, Spacer, Newline, Divider, Text, StatusLine,
   KeyValue, Metric, Link, Markdown, Callout,
@@ -34,6 +35,7 @@ const components: Record<string, (p: { props: Record<string, unknown>; children?
 
   // custom charts
   LineChart, Histogram, Heatmap,
+  CandlestickChart, AreaChart, BaselineChart,
 };
 
 function RenderElement({ id, spec }: { id: string; spec: Spec }) {
