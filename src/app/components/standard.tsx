@@ -107,9 +107,70 @@ export function Link({ props }: { props: Record<string, unknown> }) {
   );
 }
 
+function markdownToHtml(md: string): string {
+  const lines = md.split("\n");
+  const out: string[] = [];
+  let inList = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+
+    // Close list if we're no longer in one
+    if (inList && !line.match(/^[-*]\s/)) {
+      out.push("</ul>");
+      inList = false;
+    }
+
+    // Headings
+    const hMatch = line.match(/^(#{1,4})\s+(.*)/);
+    if (hMatch) {
+      const level = hMatch[1].length;
+      const sizes = [0, 20, 16, 14, 13];
+      out.push(`<div style="font-weight:bold;font-size:${sizes[level]}px;margin:8px 0 4px">${inlineFormat(hMatch[2])}</div>`);
+      continue;
+    }
+
+    // Blockquote
+    if (line.match(/^>\s?/)) {
+      const text = line.replace(/^>\s?/, "");
+      out.push(`<div style="border-left:3px solid #4b5563;padding-left:12px;color:#9ca3af;margin:6px 0">${inlineFormat(text)}</div>`);
+      continue;
+    }
+
+    // List items
+    if (line.match(/^[-*]\s/)) {
+      if (!inList) {
+        out.push('<ul style="margin:4px 0;padding-left:20px">');
+        inList = true;
+      }
+      out.push(`<li style="margin:2px 0">${inlineFormat(line.replace(/^[-*]\s/, ""))}</li>`);
+      continue;
+    }
+
+    // Empty line = spacing
+    if (line.trim() === "") {
+      out.push('<div style="height:6px"></div>');
+      continue;
+    }
+
+    // Regular paragraph
+    out.push(`<div>${inlineFormat(line)}</div>`);
+  }
+
+  if (inList) out.push("</ul>");
+  return out.join("");
+}
+
+function inlineFormat(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/`(.+?)`/g, '<code style="background:#1f2937;padding:1px 4px;border-radius:3px;font-size:0.9em">$1</code>');
+}
+
 export function Markdown({ props }: { props: Record<string, unknown> }) {
-  // Simple markdown: just render as preformatted text
-  return <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", lineHeight: 1.5 }}>{props.text as string}</pre>;
+  const html = markdownToHtml((props.text as string) ?? "");
+  return <div style={{ lineHeight: 1.6, fontSize: 14 }} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 export function Callout({ props, children }: { props: Record<string, unknown>; children?: ReactNode }) {
