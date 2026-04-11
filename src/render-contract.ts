@@ -14,8 +14,13 @@ export interface Spec {
 
 export type RenderMode = "replace" | "append" | "clear";
 
+export interface TimeValuePoint {
+  time: string | number;
+  value: number;
+}
+
 export interface SeriesData {
-  data: number[];
+  data: number[] | TimeValuePoint[];
   label?: string;
   color?: string;
   fill?: boolean;

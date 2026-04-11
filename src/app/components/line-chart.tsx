@@ -8,8 +8,13 @@ import { DARK_THEME, normalizeTime, toTimeValueData } from "./lw-chart.js";
 
 const DEFAULT_COLORS = ["#22c55e", "#06b6d4", "#eab308", "#d946ef", "#ef4444", "#3b82f6", "#9ca3af"];
 
+interface TimeValuePoint {
+  time: string | number;
+  value: number;
+}
+
 interface Series {
-  data: number[];
+  data: number[] | TimeValuePoint[];
   label?: string | null;
   color?: string | null;
   fill?: boolean | null;
@@ -17,7 +22,7 @@ interface Series {
 
 interface LineChartProps {
   props: {
-    data?: number[] | null;
+    data?: number[] | TimeValuePoint[] | null;
     series?: Series[] | null;
     width?: number | null;
     height?: number | null;
@@ -29,6 +34,10 @@ interface LineChartProps {
     maxXLabels?: number | null;
   };
 }
+
+// Synthetic base timestamp (2000-01-01 UTC) used to map xLabels indices
+// to daily offsets that lightweight-charts can space correctly.
+const XLABEL_BASE_TS = 946684800;
 
 export function LineChart({ props: p }: LineChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -43,6 +52,7 @@ export function LineChart({ props: p }: LineChartProps) {
       : [];
 
   const hasData = seriesList.length > 0 && seriesList.some((s) => s.data?.length);
+  const xLabels = p.xLabels;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -54,6 +64,18 @@ export function LineChart({ props: p }: LineChartProps) {
         ? [{ data: p.data, label: p.label, color: p.color, fill: p.fill }]
         : [];
 
+    const timeScaleOpts: Record<string, unknown> = {
+      ...DARK_THEME.timeScale,
+    };
+
+    if (xLabels) {
+      timeScaleOpts.tickMarkFormatter = (time: number) => {
+        const idx = Math.round((time - XLABEL_BASE_TS) / 86400);
+        return idx >= 0 && idx < xLabels.length ? xLabels[idx] : "";
+      };
+      timeScaleOpts.timeVisible = false;
+    }
+
     const chart = createChart(container, {
       width,
       height,
@@ -62,6 +84,7 @@ export function LineChart({ props: p }: LineChartProps) {
         ...DARK_THEME.rightPriceScale,
         visible: p.showAxis !== false,
       },
+      timeScale: timeScaleOpts as any,
     });
 
     for (let i = 0; i < series.length; i++) {
@@ -69,11 +92,21 @@ export function LineChart({ props: p }: LineChartProps) {
       if (!s.data?.length) continue;
 
       const color = (s.color as string) ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length];
-      const tvData = toTimeValueData(s.data);
-      const mapped = tvData.map((d) => ({
-        time: normalizeTime(d.time) as any,
-        value: d.value,
-      }));
+
+      let mapped;
+      if (xLabels && typeof s.data[0] === "number") {
+        // Map number[] indices to synthetic daily timestamps for xLabels
+        mapped = (s.data as number[]).map((value, idx) => ({
+          time: (XLABEL_BASE_TS + idx * 86400) as any,
+          value,
+        }));
+      } else {
+        const tvData = toTimeValueData(s.data);
+        mapped = tvData.map((d) => ({
+          time: normalizeTime(d.time) as any,
+          value: d.value,
+        }));
+      }
 
       if (s.fill) {
         const lwSeries = chart.addSeries(AreaSeries, {
@@ -95,7 +128,7 @@ export function LineChart({ props: p }: LineChartProps) {
     chart.timeScale().fitContent();
 
     return () => chart.remove();
-  }, [p.data, p.series, p.color, p.fill, p.label, width, height, p.showAxis, hasData]);
+  }, [p.data, p.series, p.color, p.fill, p.label, width, height, p.showAxis, hasData, xLabels]);
 
   if (!hasData) return null;
 
